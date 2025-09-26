@@ -196,9 +196,8 @@ pub(crate) mod net {
 // ==============================
 
 use crate::traits::*;
+use futures::Future;
 use futures::task::{FutureObj, Spawn, SpawnError};
-use futures::{Future, FutureExt};
-use std::pin::Pin;
 use std::time::Duration;
 
 /// Type to wrap `smol::Executor`.
