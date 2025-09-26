@@ -199,7 +199,7 @@ mod net {
 
 // ==============================
 
-use futures::{Future, FutureExt};
+use futures::Future;
 use std::pin::Pin;
 use std::time::Duration;
 
