@@ -9,7 +9,7 @@ use dyn_clone::DynClone;
 use educe::Educe;
 use paste::paste;
 
-use crate::{CoarseInstant, CoarseTimeProvider, SleepProvider};
+use crate::{CoarseInstant, CoarseTimeProvider, SleepProvider, SleepFuture};
 
 //-------------------- handle PreferredRuntime maybe not existing ----------
 
@@ -40,7 +40,7 @@ macro_rules! with_preferred_runtime {{ $p:ident; $($then:tt)* } => {
 //---------- principal types ----------
 
 /// Convenience alias for a boxed sleep future
-type DynSleepFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+type DynSleepFuture = Pin<Box<dyn SleepFuture>>;
 
 /// Object-safe version of `SleepProvider` and `CoarseTimeProvider`
 ///
@@ -92,6 +92,14 @@ enum Impl {
     Preferred(PreferredRuntime),
     /// Some other runtime
     Dyn(#[educe(Debug(ignore))] Box<dyn DynProvider>),
+}
+
+// Make DynSleepFuture a SleepFuture explicitly.
+impl SleepFuture for DynSleepFuture {
+    fn reset(mut self: Pin<&mut Pin<Box<(dyn SleepFuture + 'static)>>>, instant: std::time::Instant) {
+        let inner: Pin<&mut dyn SleepFuture> = self.as_mut();
+        inner.reset(instant);
+    }
 }
 
 impl DynTimeProvider {
