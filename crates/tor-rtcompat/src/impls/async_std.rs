@@ -210,10 +210,54 @@ pub fn create_runtime() -> async_executors::AsyncStd {
     async_executors::AsyncStd::new()
 }
 
+/// Wrapper around an `async_io::Timer` future.
+/// We use this wrapper so that we can implement SleepFuture on it.
+pub struct AsyncStdSleep {
+    /// Inner future.
+    timer: async_io::Timer,
+}
+
+// Implementation to construct an new future when
+// we want to reset the duration.
+// This emulation is needed because `async-std` does not
+// support resetting the current future.
+impl AsyncStdSleep {
+    /// Return a new future with an updated duration.
+    pub fn new(duration: Duration) -> Self {
+        AsyncStdSleep {
+            timer: async_io::Timer::after(duration),
+        }
+    }
+}
+
+// Make `AsyncStdSleep` implement a future.
+impl Future for AsyncStdSleep {
+    type Output = ();
+
+    fn poll(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        match Pin::new(&mut self.timer).poll(cx) {
+            std::task::Poll::Ready(_) => std::task::Poll::Ready(()),
+            std::task::Poll::Pending => std::task::Poll::Pending,
+        }
+    }
+}
+
+impl SleepFuture for AsyncStdSleep {
+    fn reset(self: Pin<&mut Self>, instant: std::time::Instant) {
+        // Return a new future with the updated timer to emulate
+        // resetting it.
+        let this = self.get_mut();
+        this.timer = async_io::Timer::at(instant);
+    }
+}
+
 impl SleepProvider for async_executors::AsyncStd {
-    type SleepFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+    type SleepFuture = AsyncStdSleep;
     fn sleep(&self, duration: Duration) -> Self::SleepFuture {
-        Box::pin(async_io::Timer::after(duration).map(|_| ()))
+        AsyncStdSleep::new(duration)
     }
 }
 
