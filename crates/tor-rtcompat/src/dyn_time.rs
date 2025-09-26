@@ -9,7 +9,7 @@ use dyn_clone::DynClone;
 use educe::Educe;
 use paste::paste;
 
-use crate::{CoarseInstant, CoarseTimeProvider, SleepProvider, SleepFuture};
+use crate::{CoarseInstant, CoarseTimeProvider, SleepFuture, SleepProvider};
 
 //-------------------- handle PreferredRuntime maybe not existing ----------
 
@@ -96,7 +96,10 @@ enum Impl {
 
 // Make DynSleepFuture a SleepFuture explicitly.
 impl SleepFuture for DynSleepFuture {
-    fn reset(mut self: Pin<&mut Pin<Box<(dyn SleepFuture + 'static)>>>, instant: std::time::Instant) {
+    fn reset(
+        mut self: Pin<&mut Pin<Box<(dyn SleepFuture + 'static)>>>,
+        instant: std::time::Instant,
+    ) {
         let inner: Pin<&mut dyn SleepFuture> = self.as_mut();
         inner.reset(instant);
     }
