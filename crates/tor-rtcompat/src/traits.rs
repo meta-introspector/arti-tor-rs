@@ -158,7 +158,7 @@ pub trait SleepFuture: Future<Output = ()> + Send + 'static {
     ///
     /// With this method we do not have to create a new sleep future.
     fn reset(self: std::pin::Pin<&mut Self>, instant: Instant);
-} 
+}
 
 /// A provider of reduced-precision timestamps
 ///
