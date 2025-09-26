@@ -28,10 +28,12 @@ use tracing::trace;
 
 use std::collections::HashSet;
 use std::fmt::Formatter;
-use tor_rtcompat::{CoarseInstant, CoarseTimeProvider, SleepProvider, SleepFuture as SleepFutureTrait};
+use tor_rtcompat::{
+    CoarseInstant, CoarseTimeProvider, SleepFuture as SleepFutureTrait, SleepProvider,
+};
 
-use crate::time_core::MockTimeCore;
 use crate::simple_time::SleepFuture;
+use crate::time_core::MockTimeCore;
 
 /// A dummy [`SleepProvider`] instance for testing.
 ///
@@ -582,7 +584,6 @@ impl SleepFutureTrait for Sleeping {
         this.inserted = false;
     }
 }
-
 
 #[cfg(all(test, not(miri)))] // miri cannot do CLOCK_REALTIME
 mod test {

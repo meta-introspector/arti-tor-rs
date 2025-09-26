@@ -15,8 +15,8 @@ use slotmap_careful::DenseSlotMap;
 
 use tor_rtcompat::CoarseInstant;
 use tor_rtcompat::CoarseTimeProvider;
-use tor_rtcompat::SleepProvider;
 use tor_rtcompat::SleepFuture as SleepFutureTrait;
+use tor_rtcompat::SleepProvider;
 
 use crate::time_core::MockTimeCore;
 
