@@ -203,14 +203,41 @@ use crate::traits::*;
 use async_trait::async_trait;
 use futures::Future;
 use std::io::Result as IoResult;
-use std::time::Duration;
 #[cfg(unix)]
 use tor_general_addr::unix;
 
+// Wrapper around a tokio sleep future.
+// We use this wrapper so that we can implement SleepFuture on it.
+pub struct TokioSleep(std::pin::Pin<Box<tokio_crate::time::Sleep>>);
+
+// Make TokioSleep a Future by delegating to the inner future.
+impl Future for TokioSleep {
+    type Output = ();
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        self.get_mut().0.as_mut().poll(cx)
+    }
+}
+
+// Implement SleepFuture by delegating to the inner future.
+impl SleepFuture for TokioSleep {
+    fn reset(self: std::pin::Pin<&mut Self>, instant: std::time::Instant) {
+        self.get_mut()
+            .0
+            .as_mut()
+            .reset(tokio_crate::time::Instant::from_std(instant));
+    }
+}
+
 impl SleepProvider for TokioRuntimeHandle {
-    type SleepFuture = tokio_crate::time::Sleep;
-    fn sleep(&self, duration: Duration) -> Self::SleepFuture {
-        tokio_crate::time::sleep(duration)
+    // SleepProvider should return our TokioSleep type which implements SleepFuture.
+    type SleepFuture = TokioSleep;
+
+    fn sleep(&self, duration: std::time::Duration) -> Self::SleepFuture {
+        TokioSleep(std::boxed::Box::pin(tokio_crate::time::sleep(duration)))
     }
 }
 
