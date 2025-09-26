@@ -28,9 +28,10 @@ use tracing::trace;
 
 use std::collections::HashSet;
 use std::fmt::Formatter;
-use tor_rtcompat::{CoarseInstant, CoarseTimeProvider, SleepProvider};
+use tor_rtcompat::{CoarseInstant, CoarseTimeProvider, SleepProvider, SleepFuture as SleepFutureTrait};
 
 use crate::time_core::MockTimeCore;
+use crate::simple_time::SleepFuture;
 
 /// A dummy [`SleepProvider`] instance for testing.
 ///
@@ -572,6 +573,16 @@ impl Future for Sleeping {
         Poll::Pending
     }
 }
+
+// Allow resetting the sleep future to a new time.
+impl SleepFutureTrait for Sleeping {
+    fn reset(self: Pin<&mut Self>, instant: Instant) {
+        let this = self.get_mut();
+        this.when = instant;
+        this.inserted = false;
+    }
+}
+
 
 #[cfg(all(test, not(miri)))] // miri cannot do CLOCK_REALTIME
 mod test {
