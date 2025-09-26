@@ -206,8 +206,8 @@ use std::io::Result as IoResult;
 #[cfg(unix)]
 use tor_general_addr::unix;
 
-// Wrapper around a tokio sleep future.
-// We use this wrapper so that we can implement SleepFuture on it.
+/// Wrapper around a tokio sleep future.
+/// We use this wrapper so that we can implement SleepFuture on it.
 pub struct TokioSleep(std::pin::Pin<Box<tokio_crate::time::Sleep>>);
 
 // Make TokioSleep a Future by delegating to the inner future.
