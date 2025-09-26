@@ -106,7 +106,7 @@ impl<T: Runtime + ToplevelBlockOn> ToplevelRuntime for T {}
 /// for other useful functions.
 pub trait SleepProvider: Clone + Send + Sync + 'static {
     /// A future returned by [`SleepProvider::sleep()`]
-    type SleepFuture: Future<Output = ()> + Send + 'static;
+    type SleepFuture: SleepFuture;
     /// Return a future that will be ready after `duration` has
     /// elapsed.
     #[must_use = "sleep() returns a future, which does nothing unless used"]
@@ -151,6 +151,14 @@ pub trait SleepProvider: Clone + Send + Sync + 'static {
     /// effect when invoked on non-testing runtimes.
     fn allow_one_advance(&self, _dur: Duration) {}
 }
+
+/// Trait exposing resettable sleep futures.
+pub trait SleepFuture: Future<Output = ()> + Send + 'static {
+    /// Reset the sleep future to expire at `instant`.
+    ///
+    /// With this method we do not have to create a new sleep future.
+    fn reset(self: std::pin::Pin<&mut Self>, instant: Instant);
+} 
 
 /// A provider of reduced-precision timestamps
 ///
