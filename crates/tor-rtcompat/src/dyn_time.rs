@@ -1,6 +1,5 @@
 //! type-erased time provider
 
-use std::future::Future;
 use std::mem::{self, MaybeUninit};
 use std::pin::Pin;
 use std::time::{Duration, Instant, SystemTime};
