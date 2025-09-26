@@ -32,7 +32,6 @@ use tor_rtcompat::{
     CoarseInstant, CoarseTimeProvider, SleepFuture as SleepFutureTrait, SleepProvider,
 };
 
-use crate::simple_time::SleepFuture;
 use crate::time_core::MockTimeCore;
 
 /// A dummy [`SleepProvider`] instance for testing.
