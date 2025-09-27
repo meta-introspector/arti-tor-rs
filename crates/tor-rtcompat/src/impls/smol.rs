@@ -228,7 +228,7 @@ impl Future for SmolSleep {
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         match self.get_mut().0.as_mut().poll(cx) {
-            std::task::Poll::Ready(_when) => std::task::Poll::Ready(()),
+            std::task::Poll::Ready(_) => std::task::Poll::Ready(()),
             std::task::Poll::Pending => std::task::Poll::Pending,
         }
     }
