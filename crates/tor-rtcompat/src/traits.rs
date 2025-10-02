@@ -156,7 +156,8 @@ pub trait SleepProvider: Clone + Send + Sync + 'static {
 pub trait SleepFuture: Future<Output = ()> + Send + 'static {
     /// Reset the sleep future to expire at `instant`.
     ///
-    /// With this method we do not have to create a new sleep future.
+    /// Calling this method allows changing the instant at which SleepFuture
+    /// will complete without removing the associated waker that is polling.
     fn reset(self: std::pin::Pin<&mut Self>, instant: Instant);
 }
 
