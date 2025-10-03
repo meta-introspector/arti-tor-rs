@@ -200,8 +200,6 @@ mod net {
 // ==============================
 
 use futures::Future;
-use std::pin::Pin;
-use std::time::Duration;
 
 use crate::traits::*;
 
@@ -210,24 +208,19 @@ pub fn create_runtime() -> async_executors::AsyncStd {
     async_executors::AsyncStd::new()
 }
 
-/// Wrapper to implement SleepFuture.
+/// Wrapper around `async_io::Timer` to make it resettable.
 pub struct AsyncStdSleep {
-    /// Inner holding reference mutable to our timer and waker.
-    inner: std::sync::Arc<std::sync::Mutex<AsyncStdSleepInner>>,
-}
+    /// Actual future that completes after a duration.
+    timer: async_io::Timer,
 
-/// Wrapper to also hold the waker received by the context when polled
-/// so we can use it to wake up previously registered tasks when resetting.
-struct AsyncStdSleepInner {
-    /// The actual timer future.
-    timer: Option<async_io::Timer>,
-    /// The waker to wake when the timer completes.
-    /// We use the one from the last poll.
+    /// The waker for the task that `ResettableTimer` is running on.
+    /// We can use this after setting `completed = true` to tell
+    /// `ResettableTimer`'s task to wake up, see that `completed = true`, and
+    /// move forward.
     waker: Option<std::task::Waker>,
-    /// Identifier to make sure we only reset the current timer.
-    counter: u64,
-    /// Whether the timer has completed.
-    ready: bool,
+
+    /// Whether or not the timer has elapsed.
+    completed: bool,
 }
 
 // Implementation to construct an new future when
@@ -235,58 +228,13 @@ struct AsyncStdSleepInner {
 // This emulation is needed because `async-std` does not
 // support resetting the current future.
 impl AsyncStdSleep {
-    /// Return a new future with a duration.
-    pub fn new(duration: Duration) -> Self {
-        Self::at(std::time::Instant::now() + duration)
-    }
-
-    /// Set a deadline and wake waker when the time is reached.
-    fn at(deadline: std::time::Instant) -> Self {
-        let inner = std::sync::Arc::new(std::sync::Mutex::new(AsyncStdSleepInner {
-            timer: Some(async_io::Timer::at(deadline)),
+    /// Create a new `AsyncStdSleep` that completes after `duration`.
+    pub fn new(duration: std::time::Duration) -> Self {
+        Self {
+            timer: async_io::Timer::after(duration),
             waker: None,
-            counter: 0,
-            ready: false,
-        }));
-
-        // Background task to await timer if it exists.
-        let inner_clone = inner.clone();
-        async_std_crate::task::spawn(async move {
-            loop {
-                // Take current timer and counter.
-                let (timer_opt, counter) = {
-                    let mut inner_lock = inner_clone.lock().expect("Mutex poisoned");
-                    (inner_lock.timer.take(), inner_lock.counter)
-                };
-                let timer = match timer_opt {
-                    Some(t) => t,
-                    None => {
-                        // No timer, exit.
-                        break;
-                    }
-                };
-
-                // Await the timer.
-                timer.await;
-
-                let waker_opt = {
-                    let mut inner_lock = inner_clone.lock().expect("Mutex poisoned");
-                    if inner_lock.counter == counter {
-                        // Get waker and mark this sleep as ready.
-                        inner_lock.ready = true;
-                        inner_lock.waker.take()
-                    } else {
-                        continue;
-                    }
-                };
-                if let Some(waker) = waker_opt {
-                    // Wake the waker if it exists.
-                    waker.wake();
-                }
-            }
-        });
-
-        AsyncStdSleep { inner }
+            completed: false,
+        }
     }
 }
 
@@ -295,40 +243,58 @@ impl Future for AsyncStdSleep {
     type Output = ();
 
     fn poll(
-        self: Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let mut inner = self.inner.lock().expect("Mutex poisoned");
-        if inner.ready {
-            // Timer has completed, ready future.
-            std::task::Poll::Ready(())
-        } else {
-            // Re-use current waker in our sleep.
-            inner.waker = Some(cx.waker().clone());
-            std::task::Poll::Pending
+        // Check if timer is already completed.
+        if self.completed {
+            return std::task::Poll::Ready(());
+        }
+
+        // Poll the underlying future (the async_io timer).
+        match std::pin::Pin::new(&mut self.timer).poll(cx) {
+            std::task::Poll::Ready(_) => {
+                // Mark as ready so other tasks polling `AsyncStdSleep` can see the completion status.
+                self.completed = true;
+                std::task::Poll::Ready(())
+            }
+            std::task::Poll::Pending => {
+                // Set waker so that we can wake up the current task
+                // when the timer has completed, ensuring that the future is polled
+                // again and sees that `completed = true`.
+                //
+                // We use `will_wake` to avoid cloning the waker unnecessarily.
+                if self
+                    .waker
+                    .as_ref()
+                    .is_none_or(|old| !old.will_wake(cx.waker()))
+                {
+                    self.waker = Some(cx.waker().clone());
+                }
+
+                std::task::Poll::Pending
+            }
         }
     }
 }
 
 impl SleepFuture for AsyncStdSleep {
-    fn reset(self: Pin<&mut Self>, instant: std::time::Instant) {
-        let mut inner = self.inner.lock().expect("Mutex poisoned");
-        // Set new timer with new instant.
-        inner.timer = Some(async_io::Timer::at(instant));
-        // Increment counter to identify the current timer.
-        inner.counter = inner.counter.wrapping_add(1);
-        inner.ready = false;
+    // Reset the timer to complete after `duration` from now.
+    fn reset(mut self: std::pin::Pin<&mut Self>, instant: std::time::Instant) {
+        self.timer =
+            async_io::Timer::after(instant.saturating_duration_since(std::time::Instant::now()));
+        self.completed = false;
 
-        // Repoll immediately.
-        if let Some(w) = inner.waker.take() {
-            w.wake();
+        // Wake up the task that `AsyncStdSleep` is running on, if there is one.
+        if let Some(waker) = &self.waker {
+            waker.wake_by_ref();
         }
     }
 }
 
 impl SleepProvider for async_executors::AsyncStd {
     type SleepFuture = AsyncStdSleep;
-    fn sleep(&self, duration: Duration) -> Self::SleepFuture {
+    fn sleep(&self, duration: std::time::Duration) -> Self::SleepFuture {
         AsyncStdSleep::new(duration)
     }
 }
