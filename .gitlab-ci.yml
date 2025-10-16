@@ -724,7 +724,7 @@ matrix-check:
   needs: ["rust-checks", "rust-recent-async-std-rustls"]
   script:
     - maint/common/apt-install python3-toml
-    - ./maint/matrix-check --parallel "5,$PARALLEL_N"
+    - ./maint/matrix-check --parallel "8,$PARALLEL_N"
   parallel:
     matrix:
       - PARALLEL_N:
@@ -733,6 +733,9 @@ matrix-check:
         - 2
         - 3
         - 4
+        - 5
+        - 6
+        - 7
 
 matrix-test-cfg:
   stage: test
