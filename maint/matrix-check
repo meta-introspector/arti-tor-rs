@@ -69,6 +69,9 @@ def test_crate_config(keyword, crate, features, default_features = False, extra_
             "--features",
             ",".join(features),
         ]
+    elif keyword == "check" and not default_features:
+        # Don't bother running check with no features
+        return
 
     if extra_args is not None:
         args += extra_args
