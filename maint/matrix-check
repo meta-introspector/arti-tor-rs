@@ -45,41 +45,11 @@ supplementary_targets["arti"] = combination(
 )
 
 
-def take(dic, key):
-    if key in dic:
-        res = dic.get(key)
-        del dic[key]
-        return res
-    return None
-
-
-def test_crate_config(keyword, crate, features, default_features = False, extra_args = None, env = None, allow_empty = False):
-    args = [
-        "cargo",
-        "--locked",
-        keyword,
-        "-p",
-        crate,
-    ]
-
-    if not default_features:
-        args.append("--no-default-features")
-
-    if features is not None and len(features) > 0:
-        args += [
-            "--features",
-            ",".join(features),
-        ]
-    elif not default_features and not allow_empty:
-        return
-
-    if extra_args is not None:
-        args += extra_args
-
-    print("running:", " ".join(args), file=sys.stderr)
-    p = run(args, env=env)
+def run_cmd(cmd, env = None):
+    print("running:", " ".join(cmd), file=sys.stderr)
+    p = run(cmd, env=env)
     if p.returncode != 0:
-        raise Exception(f"Cargo command failed: {' '.join(args)}")
+        raise Exception(f"Cargo command failed: {' '.join(cmd)}")
 
 
 def test_crate(crate):
@@ -87,27 +57,22 @@ def test_crate(crate):
     t = toml.decoder.load(toml_path)
     features = t.get("features") or {}
 
-    # remove testing features, it makes little sense to test them
-    # TODO: is this actually true? we may want to check these...
-    take(features, "testing")
-
-    default = sorted(take(features, "default") or [])
-    full = sorted(take(features, "full") or [])
-    all_features = sorted([feat for feat in features.keys()])
-
     # cargo check with various features
 
-    test_crate_config("check", crate.name, default)
-    test_crate_config("check", crate.name, full)
-    test_crate_config("check", crate.name, all_features)
+    run_cmd(["cargo", "--locked", "check", "-p", crate.name])
+    # TODO: We may want to remove this check, as fixup-features requires we have a "full" feature
+    # for all crates. If we do, we can remove all the TOML parsing from this script...
+    if "full" in features.keys():
+        run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--no-default-features", "--features", "full"])
+    run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--all-features"])
 
     for combination in supplementary_targets.get(crate.name, []):
-        test_crate_config("check", crate.name, combination)
+        run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--no-default-features", "--features", ",".join(combination)])
     # TODO test random combination?
     
     # cargo test with default features
 
-    test_crate_config("test", crate.name, None, default_features = True, extra_args = ["--all-targets"])
+    run_cmd(["cargo", "--locked", "test", "-p", crate.name, "--all-targets"])
 
     # cargo test with minimal features
 
@@ -126,7 +91,7 @@ def test_crate(crate):
 
     env = os.environ.copy()
     env["RUSTFLAGS"] = f"{env.get('RUSTFLAGS', '')} --cfg arti_features_precise"
-    test_crate_config("test", crate.name, None, extra_args =  ["--all-targets"] + conditional_options, env = env, allow_empty = True)
+    run_cmd(["cargo", "--locked", "test", "-p", crate.name, "--no-default-features", "--all-targets"] + conditional_options, env = env)
 
 
 # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
