@@ -124,7 +124,7 @@ def test_crate(crate):
 
     env = os.environ.copy()
     env["RUSTFLAGS"] = f"{env.get('RUSTFLAGS', '')} --cfg arti_features_precise"
-    test_crate_config("test", crate.name, None, default_features = False, extra_args = conditional_options, env = env)
+    test_crate_config("test", crate.name, None, default_features = False, extra_args =  ["--all-targets"] + conditional_options, env = env)
 
 
 # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
