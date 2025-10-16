@@ -64,6 +64,7 @@ def test_crate_config(crate, features, allow_empty=False):
     features = ",".join(features)
     args = [
         "cargo",
+        "--locked",
         KEYWORD,
         "-p",
         crate,
