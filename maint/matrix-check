@@ -71,9 +71,7 @@ def test_crate_config(keyword, crate, features, default_features = False):
     print("running:", " ".join(args), file=sys.stderr)
     p = run(args)
     if p.returncode != 0:
-        raise Exception(
-            f"Failed to {keyword} '{crate}' with features '{features}'"
-        )
+        raise Exception(f"Cargo command failed: {' '.join(args)}")
 
 
 def test_crate(crate):
