@@ -53,20 +53,25 @@ def take(dic, key):
 
 
 def test_crate_config(keyword, crate, features, default_features = False):
-    if features is None or len(features) == 0:
-        return
-    features = ",".join(features)
     args = [
         "cargo",
         "--locked",
         keyword,
         "-p",
         crate,
-        "--features",
-        features,
     ]
+
     if not default_features:
         args.append("--no-default-features")
+
+    if features is None or len(features) == 0:
+        if not default_features:
+            return
+    else:
+        args += [
+            "--features",
+            ",".join(features),
+        ]
 
     print("running:", " ".join(args), file=sys.stderr)
     p = run(args)
