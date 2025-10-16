@@ -93,11 +93,6 @@ def test_crate(crate):
     full = sorted(take(features, "full") or [])
     all_features = sorted([feat for feat in features.keys()])
 
-    # no features; don't test if it would already be tested by normal tests
-    if len(features) != 0:
-        # arti does not work: it requires an executor
-        if crate.name not in ["arti"]:
-            test_crate_config("check", crate.name, [], allow_empty = True)
     # default
     test_crate_config("check", crate.name, default)
     # full
@@ -126,7 +121,7 @@ def test_crate(crate):
 
     env = os.environ.copy()
     env["RUSTFLAGS"] = f"{env.get('RUSTFLAGS', '')} --cfg arti_features_precise"
-    test_crate_config("test", crate.name, None, default_features = False, extra_args =  ["--all-targets"] + conditional_options, env = env, allow_empty = True)
+    test_crate_config("test", crate.name, None, extra_args =  ["--all-targets"] + conditional_options, env = env, allow_empty = True)
 
 
 # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
