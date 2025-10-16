@@ -44,7 +44,7 @@ supplementary_targets["arti"] = combination(
 )
 
 
-def run_cmd(cmd, env = None):
+def run_cmd(cmd, env=None):
     print("running:", " ".join(cmd), file=sys.stderr)
     p = run(cmd, env=env)
     if p.returncode != 0:
@@ -55,13 +55,35 @@ def test_crate(crate):
     # cargo check with various features
 
     run_cmd(["cargo", "--locked", "check", "-p", crate.name])
-    run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--no-default-features", "--features", "full"])
+    run_cmd(
+        [
+            "cargo",
+            "--locked",
+            "check",
+            "-p",
+            crate.name,
+            "--no-default-features",
+            "--features",
+            "full",
+        ]
+    )
     run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--all-features"])
 
     for combination in supplementary_targets.get(crate.name, []):
-        run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--no-default-features", "--features", ",".join(combination)])
+        run_cmd(
+            [
+                "cargo",
+                "--locked",
+                "check",
+                "-p",
+                crate.name,
+                "--no-default-features",
+                "--features",
+                ",".join(combination),
+            ]
+        )
     # TODO test random combination?
-    
+
     # cargo test with default features
 
     run_cmd(["cargo", "--locked", "test", "-p", crate.name, "--all-targets"])
@@ -83,7 +105,19 @@ def test_crate(crate):
 
     env = os.environ.copy()
     env["RUSTFLAGS"] = f"{env.get('RUSTFLAGS', '')} --cfg arti_features_precise"
-    run_cmd(["cargo", "--locked", "test", "-p", crate.name, "--no-default-features", "--all-targets"] + conditional_options, env = env)
+    run_cmd(
+        [
+            "cargo",
+            "--locked",
+            "test",
+            "-p",
+            crate.name,
+            "--no-default-features",
+            "--all-targets",
+        ]
+        + conditional_options,
+        env=env,
+    )
 
 
 # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
@@ -117,9 +151,12 @@ def main():
 
     crates = sorted(list_crates.list_crates(), key=lambda crate: crate.name)
     for crate in list(chunks(crates, parallel_chunks))[parallel_n]:
-        print(f'\033[0Ksection_start:{int(time.time())}:{crate.name}[collapsed=true]\r\033[0KChecking {crate.name}...')
+        print(
+            f"\033[0Ksection_start:{int(time.time())}:"
+            f"{crate.name}[collapsed=true]\r\033[0KChecking {crate.name}..."
+        )
         test_crate(crate)
-        print(f'\033[0Ksection_end:{int(time.time())}:{crate.name}\r\033[0K')
+        print(f"\033[0Ksection_end:{int(time.time())}:{crate.name}\r\033[0K")
 
 
 if __name__ == "__main__":
