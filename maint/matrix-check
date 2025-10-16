@@ -52,7 +52,7 @@ def take(dic, key):
     return None
 
 
-def test_crate_config(keyword, crate, features, default_features = False, extra_args = None):
+def test_crate_config(keyword, crate, features, default_features = False, extra_args = None, env = None):
     args = [
         "cargo",
         "--locked",
@@ -64,10 +64,7 @@ def test_crate_config(keyword, crate, features, default_features = False, extra_
     if not default_features:
         args.append("--no-default-features")
 
-    if features is None or len(features) == 0:
-        if not default_features:
-            return
-    else:
+    if features is not None and len(features) > 0:
         args += [
             "--features",
             ",".join(features),
@@ -77,7 +74,7 @@ def test_crate_config(keyword, crate, features, default_features = False, extra_
         args += extra_args
 
     print("running:", " ".join(args), file=sys.stderr)
-    p = run(args)
+    p = run(args, env=env)
     if p.returncode != 0:
         raise Exception(f"Cargo command failed: {' '.join(args)}")
 
@@ -111,6 +108,23 @@ def test_crate(crate):
     # TODO test random combination?
 
     test_crate_config("test", crate.name, None, default_features = True, extra_args = ["--all-targets"])
+
+    conditional_options = []
+
+    for line in open(crate.subdir + "/Cargo.toml"):
+        conditional_option_directive = "# @@ test-all-crates conditional-option "
+        # One option per line, so it can contain spaces
+        if line.startswith(conditional_option_directive):
+            (key, option) = (
+                line[len(conditional_option_directive) :].rstrip().split(maxsplit=1)
+            )
+            if key == "minimal":
+                conditional_options.append(option)
+            continue
+
+    env = os.environ.copy()
+    env["RUSTFLAGS"] = f"{env.get('RUSTFLAGS', '')} --cfg arti_features_precise"
+    test_crate_config("test", crate.name, None, default_features = False, extra_args = conditional_options, env = env)
 
 
 # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
