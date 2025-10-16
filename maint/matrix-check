@@ -52,10 +52,8 @@ def take(dic, key):
     return None
 
 
-def test_crate_config(keyword, crate, features, allow_empty=False):
-    if features is None:
-        return
-    if len(features) == 0 and not allow_empty:
+def test_crate_config(keyword, crate, features):
+    if features is None or len(features) == 0:
         return
     features = ",".join(features)
     args = [
