@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import time
 import toml.decoder
 import sys
 import os.path
@@ -86,25 +87,29 @@ def test_crate(crate):
     t = toml.decoder.load(toml_path)
     features = t.get("features") or {}
 
-    # remove testing features, it makes little sens to test them
+    # remove testing features, it makes little sense to test them
+    # TODO: is this actually true? we may want to check these...
     take(features, "testing")
 
     default = sorted(take(features, "default") or [])
     full = sorted(take(features, "full") or [])
     all_features = sorted([feat for feat in features.keys()])
 
-    # default
+    # cargo check with various features
+
     test_crate_config("check", crate.name, default)
-    # full
     test_crate_config("check", crate.name, full)
-    # all
     test_crate_config("check", crate.name, all_features)
 
     for combination in supplementary_targets.get(crate.name, []):
         test_crate_config("check", crate.name, combination)
     # TODO test random combination?
+    
+    # cargo test with default features
 
     test_crate_config("test", crate.name, None, default_features = True, extra_args = ["--all-targets"])
+
+    # cargo test with minimal features
 
     conditional_options = []
 
