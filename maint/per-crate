@@ -155,7 +155,9 @@ def main():
             f"\033[0Ksection_start:{int(time.time())}:"
             f"{crate.name}[collapsed=true]\r\033[0KChecking {crate.name}..."
         )
+        sys.stdout.flush()
         test_crate(crate)
+        sys.stdout.flush()
         print(f"\033[0Ksection_end:{int(time.time())}:{crate.name}\r\033[0K")
 
 
