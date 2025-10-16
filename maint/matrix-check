@@ -155,7 +155,9 @@ def main():
 
     crates = sorted(list_crates.list_crates(), key=lambda crate: crate.name)
     for crate in list(chunks(crates, parallel_chunks))[parallel_n]:
+        print(f'\033[0Ksection_start:{int(time.time())}:{crate.name}[collapsed=true]\r\033[0KChecking {crate.name}...')
         test_crate(crate)
+        print(f'\033[0Ksection_end:{int(time.time())}:{crate.name}\r\033[0K')
 
 
 if __name__ == "__main__":
