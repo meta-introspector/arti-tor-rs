@@ -81,10 +81,6 @@ def test_crate_config(crate, features, allow_empty=False):
 
 
 def test_crate(crate):
-    if crate.name in ["fs-mistrust", "tor-config"]:
-        # these tests do not pass as of now. Skipping them.
-        return
-
     toml_path = os.path.join(crate.subdir, "Cargo.toml")
     t = toml.decoder.load(toml_path)
     features = t.get("features") or {}
