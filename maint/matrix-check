@@ -52,7 +52,7 @@ def take(dic, key):
     return None
 
 
-def test_crate_config(keyword, crate, features, default_features = False):
+def test_crate_config(keyword, crate, features, default_features = False, extra_args = None):
     args = [
         "cargo",
         "--locked",
@@ -72,6 +72,9 @@ def test_crate_config(keyword, crate, features, default_features = False):
             "--features",
             ",".join(features),
         ]
+
+    if extra_args is not None:
+        args += extra_args
 
     print("running:", " ".join(args), file=sys.stderr)
     p = run(args)
@@ -106,6 +109,8 @@ def test_crate(crate):
     for combination in supplementary_targets.get(crate.name, []):
         test_crate_config("check", crate.name, combination)
     # TODO test random combination?
+
+    test_crate_config("test", crate.name, None, default_features = True, extra_args = ["--all-targets"])
 
 
 # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
