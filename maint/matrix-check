@@ -11,10 +11,6 @@ from subprocess import run
 TOPDIR = os.path.split(os.path.dirname(sys.argv[0]))[0]
 os.chdir(TOPDIR)
 
-# some tests don't compile on every combination 😐
-# also test is way slower than check
-KEYWORD = "check"
-
 supplementary_targets = dict()
 
 
@@ -56,7 +52,7 @@ def take(dic, key):
     return None
 
 
-def test_crate_config(crate, features, allow_empty=False):
+def test_crate_config(keyword, crate, features, allow_empty=False):
     if features is None:
         return
     if len(features) == 0 and not allow_empty:
@@ -65,7 +61,7 @@ def test_crate_config(crate, features, allow_empty=False):
     args = [
         "cargo",
         "--locked",
-        KEYWORD,
+        keyword,
         "-p",
         crate,
         "--no-default-features",
@@ -76,7 +72,7 @@ def test_crate_config(crate, features, allow_empty=False):
     p = run(args)
     if p.returncode != 0:
         raise Exception(
-            "Failed to test '" + crate + "' with features '" + features + "'"
+            f"Failed to {keyword} '{crate}' with features '{features}'"
         )
 
 
@@ -96,16 +92,16 @@ def test_crate(crate):
     if len(features) != 0:
         # arti does not work: it requires an executor
         if crate.name not in ["arti"]:
-            test_crate_config(crate.name, [], True)
+            test_crate_config("check", crate.name, [], True)
     # default
-    test_crate_config(crate.name, default)
+    test_crate_config("check", crate.name, default)
     # full
-    test_crate_config(crate.name, full)
+    test_crate_config("check", crate.name, full)
     # all
-    test_crate_config(crate.name, all_features)
+    test_crate_config("check", crate.name, all_features)
 
     for combination in supplementary_targets.get(crate.name, []):
-        test_crate_config(crate.name, combination)
+        test_crate_config("check", crate.name, combination)
     # TODO test random combination?
 
 
