@@ -52,7 +52,7 @@ def take(dic, key):
     return None
 
 
-def test_crate_config(keyword, crate, features):
+def test_crate_config(keyword, crate, features, default_features = False):
     if features is None or len(features) == 0:
         return
     features = ",".join(features)
@@ -62,10 +62,12 @@ def test_crate_config(keyword, crate, features):
         keyword,
         "-p",
         crate,
-        "--no-default-features",
         "--features",
         features,
     ]
+    if not default_features:
+        args.append("--no-default-features")
+
     print("running:", " ".join(args), file=sys.stderr)
     p = run(args)
     if p.returncode != 0:
