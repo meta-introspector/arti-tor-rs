@@ -2,7 +2,6 @@
 
 import argparse
 import time
-import toml.decoder
 import sys
 import os.path
 import os
@@ -53,17 +52,10 @@ def run_cmd(cmd, env = None):
 
 
 def test_crate(crate):
-    toml_path = os.path.join(crate.subdir, "Cargo.toml")
-    t = toml.decoder.load(toml_path)
-    features = t.get("features") or {}
-
     # cargo check with various features
 
     run_cmd(["cargo", "--locked", "check", "-p", crate.name])
-    # TODO: We may want to remove this check, as fixup-features requires we have a "full" feature
-    # for all crates. If we do, we can remove all the TOML parsing from this script...
-    if "full" in features.keys():
-        run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--no-default-features", "--features", "full"])
+    run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--no-default-features", "--features", "full"])
     run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--all-features"])
 
     for combination in supplementary_targets.get(crate.name, []):
