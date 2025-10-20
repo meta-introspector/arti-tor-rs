@@ -86,7 +86,7 @@ def test_crate(crate):
 
     # cargo test with default features
 
-    run_cmd(["cargo", "--locked", "test", "-p", crate.name, "--all-targets"])
+    run_cmd(["cargo", "--locked", "test", "-p", crate.name])
 
     # cargo test with minimal features
 
