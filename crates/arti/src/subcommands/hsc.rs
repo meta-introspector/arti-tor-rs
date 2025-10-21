@@ -49,6 +49,11 @@ pub(crate) enum KeySubcommand {
     /// Remove a hidden service client key
     #[command(arg_required_else_help = true)]
     Remove(RemoveKeyArgs),
+
+    /// XXX:
+    #[cfg(feature = "onion-service-cli-extra")]
+    #[command(name = "ctor-migrate")]
+    CTorMigrate(CTorMigrateArgs),
 }
 
 /// A type of key
@@ -141,6 +146,16 @@ pub(crate) struct RemoveKeyArgs {
     common: CommonArgs,
 }
 
+/// The arguments of the [`CTorMigrate`](KeySubcommand::CTorMigrate) subcommand.
+#[derive(Debug, Clone, Args)]
+#[cfg(feature = "onion-service-cli-extra")]
+pub(crate) struct CTorMigrateArgs {
+    /// With this flag active no prompt will be shown
+    /// and no confirmation will be asked
+    #[arg(long, short, default_value_t = false)]
+    batch: bool,
+}
+
 /// Run the `hsc` subcommand.
 pub(crate) fn run<R: Runtime>(
     runtime: R,
@@ -174,6 +189,8 @@ fn run_key(subcommand: KeySubcommand, client: &InertTorClient) -> Result<()> {
         KeySubcommand::Get(args) => prepare_service_discovery_key(&args, client),
         KeySubcommand::Rotate(args) => rotate_service_discovery_key(&args, client),
         KeySubcommand::Remove(args) => remove_service_discovery_key(&args, client),
+        #[cfg(feature = "onion-service-cli-extra")]
+        KeySubcommand::CTorMigrate(args) => migrate_ctor_service_discovery_keys(&args, client),
     }
 }
 
@@ -275,6 +292,17 @@ fn remove_service_discovery_key(args: &RemoveKeyArgs, client: &InertTorClient) -
 
     let _key = client.remove_service_discovery_key(KeystoreSelector::default(), addr)?;
 
+    Ok(())
+}
+
+/// XXX:
+#[cfg(feature = "onion-service-cli-extra")]
+fn migrate_ctor_service_discovery_keys(
+    args: &CTorMigrateArgs,
+    client: &InertTorClient,
+) -> Result<()> {
+    let keymgr = client.keymgr()?;
+    // XXX:
     Ok(())
 }
 
