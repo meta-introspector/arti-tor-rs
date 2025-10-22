@@ -8,6 +8,13 @@ use arti_client::{HsClientDescEncKey, HsId, InertTorClient, KeystoreSelector, To
 use clap::{ArgMatches, Args, FromArgMatches, Parser, Subcommand, ValueEnum};
 use safelog::DisplayRedacted;
 use tor_rtcompat::Runtime;
+#[cfg(feature = "onion-service-cli-extra")]
+use {
+    std::collections::{HashMap, hash_map},
+    tor_hsclient::HsClientDescEncKeypairSpecifier,
+    tor_hscrypto::pk::HsClientDescEncKeypair,
+    tor_keymgr::{CTorPath, KeyPath, KeystoreId},
+};
 
 use std::fs::OpenOptions;
 use std::io::{self, Write};
@@ -302,7 +309,66 @@ fn migrate_ctor_service_discovery_keys(
     client: &InertTorClient,
 ) -> Result<()> {
     let keymgr = client.keymgr()?;
-    // XXX:
+    let entries = keymgr.list()?.into_iter();
+    let mut ctor_client_entries = HashMap::new();
+    for res in entries {
+        if let Ok(entry) = res {
+            // XXX: memcopies
+            if let KeyPath::CTor(CTorPath::ClientHsDescEncKey(hsid)) = entry.key_path() {
+                let hsid = hsid.to_owned();
+                if let hash_map::Entry::Occupied(_) = ctor_client_entries.entry(hsid) {
+                    eprintln!(
+                        "WARNING: Multiple keys encountered for the same serivce {}",
+                        hsid.display_redacted()
+                    );
+                } else {
+                    ctor_client_entries.insert(hsid, entry.clone());
+                }
+            };
+        }
+    }
+    let mut already_present = Vec::new();
+    for (hsid, _) in ctor_client_entries.iter() {
+        let mut addr = hsid.display_unredacted().to_string();
+        addr.truncate(addr.len().saturating_sub(6));
+        let arti_pat = tor_keymgr::KeyPathPattern::Arti(format!("client/{}/*", addr));
+
+        let arti_entries = keymgr.list_matching(&arti_pat)?;
+        if arti_entries.len() > 0 {
+            already_present.push(hsid)
+        }
+    }
+    let proceed = if args.batch || already_present.is_empty() {
+        true
+    } else {
+        let mut p = "Found keys in the primary store for:\n".to_string();
+        for hsid in already_present {
+            p.push('\t');
+            p.push_str(&hsid.display_redacted().to_string());
+            p.push('\n');
+        }
+        p.push_str("These entries will be deleted. Proceed anyway?");
+        prompt(&p)?
+    };
+
+    if proceed {
+        let arti_keystore_id = KeystoreId::from_str("arti")
+            .map_err(|_| anyhow!("Default arti keystore ID is not valid?!"))?;
+        for (hsid, entry) in ctor_client_entries {
+            // XXX: error handling
+            if let Ok(Some(key)) = keymgr.get_entry::<HsClientDescEncKeypair>(&entry) {
+                let _ = keymgr.insert(
+                    key,
+                    &HsClientDescEncKeypairSpecifier::new(hsid),
+                    (&arti_keystore_id).into(),
+                    true,
+                );
+            }
+        }
+    } else {
+        println!("Aborted.");
+    }
+
     Ok(())
 }
 
