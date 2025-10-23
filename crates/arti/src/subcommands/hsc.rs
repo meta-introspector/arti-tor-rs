@@ -13,7 +13,7 @@ use {
     std::collections::{HashMap, hash_map},
     tor_hsclient::HsClientDescEncKeypairSpecifier,
     tor_hscrypto::pk::HsClientDescEncKeypair,
-    tor_keymgr::{CTorPath, KeyPath, KeystoreId},
+    tor_keymgr::{CTorPath, KeyMgr, KeyPath, KeystoreEntry, KeystoreEntryResult, KeystoreId},
 };
 
 use std::fs::OpenOptions;
@@ -57,7 +57,8 @@ pub(crate) enum KeySubcommand {
     #[command(arg_required_else_help = true)]
     Remove(RemoveKeyArgs),
 
-    /// XXX:
+    /// Migrate service discovery keys from the registered CTor keystore to the primary
+    /// keystore
     #[cfg(feature = "onion-service-cli-extra")]
     #[command(name = "ctor-migrate")]
     CTorMigrate(CTorMigrateArgs),
@@ -302,7 +303,7 @@ fn remove_service_discovery_key(args: &RemoveKeyArgs, client: &InertTorClient) -
     Ok(())
 }
 
-/// XXX:
+/// Run the `hsc key ctor-migrate` subcommand.
 #[cfg(feature = "onion-service-cli-extra")]
 fn migrate_ctor_service_discovery_keys(
     args: &CTorMigrateArgs,
@@ -311,58 +312,40 @@ fn migrate_ctor_service_discovery_keys(
     let keymgr = client.keymgr()?;
     let entries = keymgr.list()?.into_iter();
     let mut ctor_client_entries = HashMap::new();
-    for res in entries {
-        if let Ok(entry) = res {
-            // XXX: memcopies
-            if let KeyPath::CTor(CTorPath::ClientHsDescEncKey(hsid)) = entry.key_path() {
-                let hsid = hsid.to_owned();
-                if let hash_map::Entry::Occupied(_) = ctor_client_entries.entry(hsid) {
-                    eprintln!(
-                        "WARNING: Multiple keys encountered for the same serivce {}",
-                        hsid.display_redacted()
-                    );
-                } else {
-                    ctor_client_entries.insert(hsid, entry.clone());
-                }
-            };
-        }
-    }
     let mut already_present = Vec::new();
-    for (hsid, _) in ctor_client_entries.iter() {
-        let mut addr = hsid.display_unredacted().to_string();
-        addr.truncate(addr.len().saturating_sub(6));
-        let arti_pat = tor_keymgr::KeyPathPattern::Arti(format!("client/{}/*", addr));
 
-        let arti_entries = keymgr.list_matching(&arti_pat)?;
-        if arti_entries.len() > 0 {
-            already_present.push(hsid)
-        }
+    for res in entries {
+        handle_keytore_entry_result(res, &mut ctor_client_entries, &mut already_present, keymgr)?;
     }
-    let proceed = if args.batch || already_present.is_empty() {
-        true
-    } else {
-        let mut p = "Found keys in the primary store for:\n".to_string();
-        for hsid in already_present {
-            p.push('\t');
-            p.push_str(&hsid.display_redacted().to_string());
-            p.push('\n');
-        }
-        p.push_str("These entries will be deleted. Proceed anyway?");
-        prompt(&p)?
-    };
 
-    if proceed {
+    if ctor_client_entries.is_empty() {
+        return Err(anyhow!(
+            "No CTor client keys found in any of the available keystores."
+        ));
+    }
+
+    if args.batch
+        || already_present.is_empty()
+        || prompt(&build_prompt_for_migrate(&already_present))?
+    {
         let arti_keystore_id = KeystoreId::from_str("arti")
             .map_err(|_| anyhow!("Default arti keystore ID is not valid?!"))?;
         for (hsid, entry) in ctor_client_entries {
-            // XXX: error handling
             if let Ok(Some(key)) = keymgr.get_entry::<HsClientDescEncKeypair>(&entry) {
-                let _ = keymgr.insert(
-                    key,
-                    &HsClientDescEncKeypairSpecifier::new(hsid),
-                    (&arti_keystore_id).into(),
-                    true,
-                );
+                if keymgr
+                    .insert(
+                        key,
+                        &HsClientDescEncKeypairSpecifier::new(hsid),
+                        (&arti_keystore_id).into(),
+                        true,
+                    )
+                    .is_err()
+                {
+                    eprintln!(
+                        "WARNING: failed to insert key for service {}",
+                        hsid.display_redacted()
+                    );
+                }
             }
         }
     } else {
@@ -382,4 +365,54 @@ fn get_onion_address(args: &CommonArgs) -> Result<HsId, anyhow::Error> {
     io::stdin().read_line(&mut addr).map_err(|e| anyhow!(e))?;
 
     HsId::from_str(addr.trim_end()).map_err(|e| anyhow!(e))
+}
+
+/// Helper function for `migrate_ctor_service_discovery_keys`.
+/// Builds a prompt that will be passed to the [`prompt`] function.
+#[cfg(feature = "onion-service-cli-extra")]
+fn build_prompt_for_migrate(hsids: &Vec<HsId>) -> String {
+    let mut p = "WARNING: Found keys in the primary store for:\n".to_string();
+    for hsid in hsids {
+        p.push('\t');
+        p.push_str(&hsid.display_redacted().to_string());
+        p.push('\n');
+    }
+    p.push_str("These entries will be deleted. Proceed anyway?");
+    p
+}
+
+/// Helper function for `migrate_ctor_service_discovery_keys`.
+/// Inserts the entry from `res` into `ctor_client_entries` if it is a CTor client key.
+/// If a clash occurs (multiple CTor entries for the same service) the user is warned.
+/// Detects whether the primary keystore already contains an entry for the service of `res`.
+/// If so, the `HsId` of the service is added to `already_present`.
+#[cfg(feature = "onion-service-cli-extra")]
+fn handle_keytore_entry_result<'a>(
+    res: KeystoreEntryResult<KeystoreEntry<'a>>,
+    ctor_client_entries: &mut HashMap<HsId, KeystoreEntry<'a>>,
+    already_present: &mut Vec<HsId>,
+    keymgr: &KeyMgr,
+) -> Result<()> {
+    if let Ok(entry) = res {
+        if let KeyPath::CTor(CTorPath::ClientHsDescEncKey(hsid)) = entry.key_path() {
+            if let hash_map::Entry::Occupied(_) = ctor_client_entries.entry(*hsid) {
+                eprintln!(
+                    "WARNING: Multiple keys exist for service {}; ctor-migrate uses only one.",
+                    hsid.display_redacted()
+                );
+            } else {
+                ctor_client_entries.insert(*hsid, entry.clone());
+                let mut addr = hsid.display_unredacted().to_string();
+                addr.truncate(addr.len().saturating_sub(6));
+                let arti_pat = tor_keymgr::KeyPathPattern::Arti(format!("client/{}/*", addr));
+
+                let arti_entries = keymgr.list_matching(&arti_pat)?;
+                if !arti_entries.is_empty() {
+                    already_present.push(*hsid);
+                }
+            }
+        };
+    }
+
+    Ok(())
 }
