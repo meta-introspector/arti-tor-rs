@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-import toml.decoder
+import time
 import sys
 import os.path
 import os
@@ -10,10 +10,6 @@ from subprocess import run
 
 TOPDIR = os.path.split(os.path.dirname(sys.argv[0]))[0]
 os.chdir(TOPDIR)
-
-# some tests don't compile on every combination 😐
-# also test is way slower than check
-KEYWORD = "check"
 
 supplementary_targets = dict()
 
@@ -48,68 +44,80 @@ supplementary_targets["arti"] = combination(
 )
 
 
-def take(dic, key):
-    if key in dic:
-        res = dic.get(key)
-        del dic[key]
-        return res
-    return None
-
-
-def test_crate_config(crate, features, allow_empty=False):
-    if features is None:
-        return
-    if len(features) == 0 and not allow_empty:
-        return
-    features = ",".join(features)
-    args = [
-        "cargo",
-        KEYWORD,
-        "-p",
-        crate,
-        "--no-default-features",
-        "--features",
-        features,
-    ]
-    print("running:", " ".join(args), file=sys.stderr)
-    p = run(args)
+def run_cmd(cmd, env=None):
+    print("running:", " ".join(cmd), file=sys.stderr)
+    p = run(cmd, env=env)
     if p.returncode != 0:
-        raise Exception(
-            "Failed to test '" + crate + "' with features '" + features + "'"
-        )
+        raise Exception(f"Cargo command failed: {' '.join(cmd)}")
 
 
 def test_crate(crate):
-    if crate.name in ["fs-mistrust", "tor-config"]:
-        # these tests do not pass as of now. Skipping them.
-        return
+    # cargo check with various features
 
-    toml_path = os.path.join(crate.subdir, "Cargo.toml")
-    t = toml.decoder.load(toml_path)
-    features = t.get("features") or {}
-
-    # remove testing features, it makes little sens to test them
-    take(features, "testing")
-
-    default = sorted(take(features, "default") or [])
-    full = sorted(take(features, "full") or [])
-    all_features = sorted([feat for feat in features.keys()])
-
-    # no features; don't test if it would already be tested by normal tests
-    if len(features) != 0:
-        # arti does not work: it requires an executor
-        if crate.name not in ["arti"]:
-            test_crate_config(crate.name, [], True)
-    # default
-    test_crate_config(crate.name, default)
-    # full
-    test_crate_config(crate.name, full)
-    # all
-    test_crate_config(crate.name, all_features)
+    run_cmd(["cargo", "--locked", "check", "-p", crate.name])
+    run_cmd(
+        [
+            "cargo",
+            "--locked",
+            "check",
+            "-p",
+            crate.name,
+            "--no-default-features",
+            "--features",
+            "full",
+        ]
+    )
+    run_cmd(["cargo", "--locked", "check", "-p", crate.name, "--all-features"])
 
     for combination in supplementary_targets.get(crate.name, []):
-        test_crate_config(crate.name, combination)
+        run_cmd(
+            [
+                "cargo",
+                "--locked",
+                "check",
+                "-p",
+                crate.name,
+                "--no-default-features",
+                "--features",
+                ",".join(combination),
+            ]
+        )
     # TODO test random combination?
+
+    # cargo test with default features
+
+    run_cmd(["cargo", "--locked", "test", "-p", crate.name])
+
+    # cargo test with minimal features
+
+    conditional_options = []
+
+    for line in open(crate.subdir + "/Cargo.toml"):
+        conditional_option_directive = "# @@ test-all-crates conditional-option "
+        # One option per line, so it can contain spaces
+        if line.startswith(conditional_option_directive):
+            (key, option) = (
+                line[len(conditional_option_directive) :].rstrip().split(maxsplit=1)
+            )
+            if key == "minimal":
+                conditional_options.append(option)
+            continue
+
+    env = os.environ.copy()
+    env["RUSTFLAGS"] = f"{env.get('RUSTFLAGS', '')} --cfg arti_features_precise"
+    run_cmd(
+        [
+            "cargo",
+            "--locked",
+            "test",
+            "-p",
+            crate.name,
+            "--no-default-features",
+            "--all-targets",
+        ]
+        + conditional_options,
+        env=env,
+    )
 
 
 # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
@@ -143,7 +151,14 @@ def main():
 
     crates = sorted(list_crates.list_crates(), key=lambda crate: crate.name)
     for crate in list(chunks(crates, parallel_chunks))[parallel_n]:
+        print(
+            f"\033[0Ksection_start:{int(time.time())}:"
+            f"{crate.name}[collapsed=true]\r\033[0KChecking {crate.name}..."
+        )
+        sys.stdout.flush()
         test_crate(crate)
+        sys.stdout.flush()
+        print(f"\033[0Ksection_end:{int(time.time())}:{crate.name}\r\033[0K")
 
 
 if __name__ == "__main__":
