@@ -126,7 +126,6 @@ use tracing::{error, info, instrument, warn};
 use clap::Subcommand as _;
 
 #[cfg(feature = "experimental-api")]
-#[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
 pub use subcommands::proxy::run_proxy as run;
 
 /// Create a runtime for Arti to use.

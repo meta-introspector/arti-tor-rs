@@ -40,7 +40,6 @@ define_derive_deftly! {
 
 /// A subclass of ChanMsg that can arrive in response to a CREATE* cell
 /// that we send.
-#[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 #[derive(Debug, Deftly)]
 #[allow(unreachable_pub)] // Only `pub` with feature `testing`; otherwise, visible in crate
 #[allow(clippy::exhaustive_enums)]

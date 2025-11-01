@@ -391,7 +391,6 @@ pub(crate) mod test_config {
     #[derive(Default, derive_more::AsRef)]
     #[allow(clippy::exhaustive_structs)]
     #[allow(missing_docs)]
-    #[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
     pub struct TestConfig {
         pub path_rules: PathConfig,
         pub circuit_timing: CircuitTiming,

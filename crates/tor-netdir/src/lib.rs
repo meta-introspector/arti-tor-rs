@@ -107,7 +107,6 @@ use params::NetParameters;
 use tor_geoip::{CountryCode, GeoipDb, HasCountryCode};
 
 #[cfg(feature = "hs-common")]
-#[cfg_attr(docsrs, doc(cfg(feature = "hs-common")))]
 pub use hsdir_params::HsDirParams;
 
 /// Index into the consensus relays
@@ -855,7 +854,6 @@ impl PartialNetDir {
     /// This does the same thing as `new()`, except the provided GeoIP database is used to add
     /// country codes to relays.
     #[cfg(feature = "geoip")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "geoip")))]
     pub fn new_with_geoip(
         consensus: MdConsensus,
         replacement_params: Option<&netstatus::NetParams<i32>>,
@@ -1394,7 +1392,6 @@ impl NetDir {
     /// the current consensus, even if we don't yet have enough information
     /// (like a microdescriptor) about the relay to use it.
     #[cfg_attr(feature = "experimental-api", visibility::make(pub))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     fn by_rsa_id_unchecked(&self, rsa_id: &RsaIdentity) -> Option<UncheckedRelay<'_>> {
         let rsidx = *self.rsidx_by_rsa.get(rsa_id)?;
         let rs = self.c_relays().get(rsidx).expect("Corrupt index");
@@ -1412,7 +1409,6 @@ impl NetDir {
     /// (An "[unusable](NetDir#usable)" relay in this context is one for which we don't have full
     /// directory information.)
     #[cfg_attr(feature = "experimental-api", visibility::make(pub))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     fn rsa_id_is_listed(&self, rsa_id: &RsaIdentity) -> bool {
         self.by_rsa_id_unchecked(rsa_id).is_some()
     }
@@ -2106,7 +2102,6 @@ impl<'a> HasAddrs for Relay<'a> {
     }
 }
 #[cfg(feature = "geoip")]
-#[cfg_attr(docsrs, doc(cfg(feature = "geoip")))]
 impl<'a> HasCountryCode for Relay<'a> {
     fn country_code(&self) -> Option<CountryCode> {
         self.cc

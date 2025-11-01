@@ -68,7 +68,6 @@ cfg_if::cfg_if! {
 }
 
 /// A message telling the channel reactor to do something.
-#[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 #[derive(Debug)]
 #[allow(unreachable_pub)] // Only `pub` with feature `testing`; otherwise, visible in crate
 #[allow(clippy::exhaustive_enums, private_interfaces)]

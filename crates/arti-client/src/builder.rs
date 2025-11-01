@@ -19,7 +19,6 @@ use tor_rtcompat::Runtime;
 /// Note that this type is only actually exposed when the `experimental-api`
 /// feature is enabled.
 #[allow(unreachable_pub)]
-#[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
 pub trait DirProviderBuilder<R: Runtime>: Send + Sync {
     fn build(
         &self,
