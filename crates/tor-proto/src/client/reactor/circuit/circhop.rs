@@ -15,6 +15,7 @@ use crate::tunnel::TunnelScopedCircId;
 use crate::util::notify::NotifySender;
 use crate::util::tunnel_activity::TunnelActivity;
 use crate::{Error, Result};
+use tor_async_utils::notify::NotifySender;
 
 use futures::Stream;
 use futures::stream::FuturesUnordered;

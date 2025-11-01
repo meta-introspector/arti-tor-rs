@@ -9,9 +9,6 @@
 //! An optional type can be attached to the `NotifySender` and `NotifyReceiver` to identify the
 //! purpose of the notifications and to provide type checking.
 
-// TODO(arti#534): we expect to use this for flow control, so we should remove this later
-#![cfg_attr(not(test), expect(dead_code))]
-
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -27,7 +24,7 @@ use postage::watch;
 /// See the [module documentation](self) for details.
 #[derive(Educe)]
 #[educe(Debug)]
-pub(crate) struct NotifySender<T = ()> {
+pub struct NotifySender<T = ()> {
     /// The "sender" we use to implement the async behaviour.
     sender: watch::Sender<()>,
     /// Allows the user to optionally attach a type marker to identify the purpose of the
@@ -45,7 +42,7 @@ pub(crate) struct NotifySender<T = ()> {
 #[derive(Educe)]
 #[educe(Debug)]
 #[pin_project]
-pub(crate) struct NotifyReceiver<T = ()> {
+pub struct NotifyReceiver<T = ()> {
     /// The "receiver" we use to implement the async behaviour.
     #[pin]
     receiver: Fuse<watch::Receiver<()>>,
@@ -55,16 +52,22 @@ pub(crate) struct NotifyReceiver<T = ()> {
     _marker: PhantomData<fn() -> T>,
 }
 
+impl Default for NotifySender {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NotifySender {
     /// Create a new untyped [`NotifySender`].
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::new_typed()
     }
 }
 
 impl<T> NotifySender<T> {
     /// Create a new typed [`NotifySender<T>`].
-    pub(crate) fn new_typed() -> Self {
+    pub fn new_typed() -> Self {
         let (sender, _receiver) = watch::channel();
         Self {
             sender,
@@ -73,7 +76,7 @@ impl<T> NotifySender<T> {
     }
 
     /// Notify all [`NotifyReceiver`]s.
-    pub(crate) fn notify(&mut self) {
+    pub fn notify(&mut self) {
         // from `postage::watch::Sender`:
         // > Mutably borrows the contained value, blocking the channel while the borrow is held.
         // > After the borrow is released, receivers will be notified of a new value.
@@ -83,7 +86,7 @@ impl<T> NotifySender<T> {
     /// Create a new [`NotifyReceiver`] for this [`NotifySender`].
     ///
     /// A new `NotifyReceiver` will not see any past notifications.
-    pub(crate) fn subscribe(&mut self) -> NotifyReceiver<T> {
+    pub fn subscribe(&mut self) -> NotifyReceiver<T> {
         let mut receiver = self.sender.subscribe();
 
         // a `watch::Receiver` will always return the existing status of the `watch::Sender` as the

@@ -21,12 +21,12 @@ use crate::stream::flow_ctrl::state::StreamRateLimit;
 use crate::stream::flow_ctrl::xon_xoff::reader::DrainRateRequest;
 use crate::stream::queue::StreamQueueSender;
 use crate::streammap;
-use crate::util::notify::NotifySender;
 use crate::util::skew::ClockSkew;
 use crate::util::tunnel_activity::TunnelActivity;
 #[cfg(test)]
 use crate::{circuit::UniqId, client::circuit::CircParameters, crypto::cell::HopNum};
 use postage::watch;
+use tor_async_utils::notify::NotifySender;
 use tor_cell::chancell::msg::HandshakeType;
 use tor_cell::relaycell::flow_ctrl::XonKbpsEwma;
 use tor_cell::relaycell::msg::{AnyRelayMsg, Sendme};

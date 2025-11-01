@@ -6315,6 +6315,7 @@ dependencies = [
 name = "tor-async-utils"
 version = "0.36.0"
 dependencies = [
+ "cfg-if",
  "derive-deftly",
  "educe",
  "futures",
@@ -6322,11 +6323,17 @@ dependencies = [
  "oneshot-fused-workaround",
  "pin-project",
  "postage",
+ "rand 0.9.2",
+ "slotmap-careful",
+ "sync_wrapper",
  "thiserror 2.0.17",
  "tokio",
+ "tokio-util",
  "tor-error",
  "tor-rtcompat",
  "tor-rtmock",
+ "tracing",
+ "visibility",
  "void",
 ]
 
@@ -7356,12 +7363,10 @@ dependencies = [
  "rand_core 0.9.3",
  "regex",
  "safelog",
- "slotmap-careful",
  "smallvec",
  "static_assertions",
  "statrs",
  "subtle",
- "sync_wrapper",
  "thiserror 2.0.17",
  "tokio",
  "tokio-util",

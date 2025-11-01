@@ -15,7 +15,7 @@ use super::xon_xoff::state::XonXoffFlowCtrl;
 
 use crate::Result;
 use crate::congestion::sendme;
-use crate::util::notify::NotifySender;
+use tor_async_utils::notify::NotifySender;
 
 /// Private internals of [`StreamFlowCtrl`].
 #[enum_dispatch::enum_dispatch]

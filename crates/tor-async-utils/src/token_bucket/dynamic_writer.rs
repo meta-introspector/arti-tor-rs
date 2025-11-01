@@ -17,7 +17,7 @@ use super::writer::{RateLimitedWriter, RateLimitedWriterConfig};
 #[derive(educe::Educe)]
 #[educe(Debug)]
 #[pin_project::pin_project]
-pub(crate) struct DynamicRateLimitedWriter<W: AsyncWrite, S, P: SleepProvider> {
+pub struct DynamicRateLimitedWriter<W: AsyncWrite, S, P: SleepProvider> {
     /// The rate-limited writer.
     #[pin]
     writer: RateLimitedWriter<W, P>,
@@ -35,12 +35,12 @@ where
     /// Create a new [`DynamicRateLimitedWriter`].
     ///
     /// This wraps the `writer` and watches for configuration changes from the `updates` stream.
-    pub(crate) fn new(writer: RateLimitedWriter<W, P>, updates: S) -> Self {
+    pub fn new(writer: RateLimitedWriter<W, P>, updates: S) -> Self {
         Self { writer, updates }
     }
 
     /// Access the inner [`AsyncWrite`] writer of the [`RateLimitedWriter`].
-    pub(crate) fn inner(&self) -> &W {
+    pub fn inner(&self) -> &W {
         self.writer.inner()
     }
 }
@@ -105,7 +105,7 @@ where
 mod tokio_impl {
     use super::*;
 
-    use tokio_crate::io::AsyncWrite as TokioAsyncWrite;
+    use tokio::io::AsyncWrite as TokioAsyncWrite;
     use tokio_util::compat::FuturesAsyncWriteCompatExt;
 
     use std::io::Result as IoResult;
@@ -138,15 +138,17 @@ mod tokio_impl {
 mod test {
     #![allow(clippy::unwrap_used)]
 
-    use super::*;
-
+    use crate::token_bucket::dynamic_writer::DynamicRateLimitedWriter;
+    use crate::token_bucket::writer::RateLimitedWriter;
+    use crate::token_bucket::writer::RateLimitedWriterConfig;
+    use futures::FutureExt;
+    use futures::SinkExt;
+    use futures::io::{AsyncReadExt, AsyncWriteExt};
     use std::num::NonZero;
-    use std::time::Duration;
-
-    use futures::{AsyncReadExt, AsyncWriteExt, FutureExt, SinkExt};
-    use tor_rtcompat::SpawnExt;
+    use tor_rtcompat::{SleepProvider, SpawnExt};
 
     #[cfg(feature = "tokio")]
+    use tokio::time::Duration;
     use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
     /// This test ensures that a [`DynamicRateLimitedWriter`] writes the expected number of bytes,
@@ -175,7 +177,7 @@ mod test {
 
             // there are some other crates which allow you to make a data "pipe" without tokio, but
             // I don't think it's worth bringing in a new dev-dependency for this
-            let (writer, reader) = tokio_crate::io::duplex(/* max_buf_size= */ 1000);
+            let (writer, reader) = tokio::io::duplex(/* max_buf_size= */ 1000);
             let writer = writer.compat_write();
             let mut reader = reader.compat();
 
