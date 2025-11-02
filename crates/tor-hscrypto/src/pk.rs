@@ -190,7 +190,7 @@ impl FromStr for HsId {
         // we encounter an address with the wrong version.  But that is very complicated
         // because the encoding format does not make that at all convenient.
         // So instead our errors tell you what aspect of the parsing went wrong.
-        let binary = Base32Unpadded::decode_vec(s.to_lowercase().as_str()).unwrap();
+        let binary = Base32Unpadded::decode_vec(s.to_lowercase().as_str())?;
         let mut binary = tor_bytes::Reader::from_slice(&binary);
 
         let pubkey: [u8; 32] = binary.extract()?;
