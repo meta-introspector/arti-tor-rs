@@ -870,7 +870,7 @@ mod test {
         };
 
         chk_err!("wrong", PE::NotOnionDomain);
-        //chk_err!("@.onion", PE::InvalidBase32(..));
+        chk_err!("@.onion", PE::Base32ValidationFailed);
         chk_err!("aaaaaaaa.onion", PE::InvalidData(..));
         chk_err!(edited(55, b'E'), PE::UnsupportedVersion(4));
         chk_err!(edited(53, b'X'), PE::WrongChecksum);
