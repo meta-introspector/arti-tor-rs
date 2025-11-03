@@ -16,29 +16,37 @@
 //! to directory mirrors.
 
 use std::{
+    fmt::Debug,
+    net::SocketAddr,
     ops::Deref,
     time::{Duration, SystemTime},
 };
 
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use rand::Rng;
+use rand::{seq::IndexedRandom, Rng};
+use retry_error::RetryError;
 use rusqlite::{
     params,
     types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef},
     OptionalExtension, ToSql, Transaction,
 };
-use tor_basic_utils::RngExt;
+use tokio::net::TcpStream;
+use tokio_util::compat::TokioAsyncReadCompatExt;
+use tor_basic_utils::{retry::RetryDelay, RngExt};
+use tor_dirclient::request::Requestable;
 use tor_dircommon::{
     authority::AuthorityContacts,
     config::{DirTolerance, DownloadScheduleConfig},
 };
 use tor_error::internal;
 use tor_netdoc::doc::netstatus::ConsensusFlavor;
+use tor_rtcompat::PreferredRuntime;
+use tracing::{debug, warn};
 
 use crate::{
     database::{self, sql, Sha256},
-    err::{DatabaseError, FatalError},
+    err::{AuthorityCommunicationError, DatabaseError, FatalError},
 };
 
 /// A saturating wrapper around [`SystemTime`].
@@ -317,6 +325,113 @@ fn calculate_sync_timeout<R: Rng>(
     )
 }
 
+/// Performs a request of a [`Requestable`] to a single authority.
+///
+/// A single authority consists of multiple endpoints, which we will try in a
+/// concurrent round-robin fashion, taking the first one that succeeds.  This is
+/// implemented as a part of [`tokio`], as specified in [`TcpStream::connect()`].
+///
+/// # Panics
+///
+/// This function panics if `endpoints` is empty.
+async fn request_single<Req: Requestable + Debug>(
+    endpoints: &[SocketAddr],
+    req: &Req,
+) -> Result<Vec<u8>, AuthorityCommunicationError> {
+    assert!(!endpoints.is_empty());
+    let rt = PreferredRuntime::current().expect("outside of tokio?");
+
+    // Fortunately, Tokio's TcpStream::connect already offers round-robin.
+    let stream = TcpStream::connect(&endpoints).await?;
+    debug!(
+        "connected to {}",
+        stream
+            .peer_addr()
+            .map(|x| x.to_string())
+            .unwrap_or("N/A".to_string())
+    );
+    let mut stream = stream.compat();
+
+    // Perform the actual request.
+    match tor_dirclient::send_request(&rt, req, &mut stream, None)
+        .await
+        .map(|resp| resp.into_output())
+    {
+        Ok(Ok(resp)) => Ok(resp),
+        Ok(Err(e)) => Err(Box::new(e).into()),
+        Err(tor_dirclient::Error::RequestFailed(e)) => Err(Box::new(e).into()),
+        Err(e) => Err(AuthorityCommunicationError::Bug(internal!("{e}"))),
+    }
+}
+
+/// Performs a retrying request of a [`Requestable`] to a set of authorities.
+///
+/// This function performs a request to a randomized set of authorities in a
+/// round-robin fashion, retrying with decorrelated jitter timeout in the case
+/// of a failure.
+///
+/// The return value is either the first successful response from an authority
+/// to the request or a collection of all errors in a [`RetryError`].
+///
+/// Connections are made in a round-robin fashion per endpoint, see
+/// [`request_single()`] and [`TcpStream::connect()`] respectively for more
+/// information on this.
+///
+/// # Algorithm
+///
+/// For retrying failed downloads, the [`RetryDelay`] timeout performs the
+/// complicated part.  See its documentation.
+///
+/// # Specifications
+///
+/// * <https://spec.torproject.org/dir-spec/client-operation.html#retrying-failed-downloads>
+/// * <https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/>
+#[allow(clippy::cognitive_complexity)]
+async fn request_multi<R: Rng, Req: Requestable + Debug>(
+    authorities: &[Vec<SocketAddr>],
+    req: &Req,
+    rng: &mut R,
+) -> Result<Vec<u8>, RetryError<AuthorityCommunicationError>> {
+    // Because this is a round-robin approach, we want to collect errors.
+    let mut err = RetryError::in_attempt_to("request to authority");
+
+    // TODO: Use rand::IndexedRandom::choose_iter once we have rand 0.10.
+    let random_auths = authorities.choose_multiple(rng, authorities.len());
+
+    // Use this struct to calculate delays between iterations.
+    let mut retry_delay = RetryDelay::default();
+
+    // Go over each authority in randomized ordered until the first succeeds.
+    for endpoints in random_auths {
+        if endpoints.is_empty() {
+            warn!("authority without endpoints?");
+            continue;
+        }
+
+        match request_single(endpoints, req).await {
+            Ok(resp) => {
+                debug!(
+                    "request {req:?} to {endpoints:?} succeeded: received {} bytes",
+                    resp.len()
+                );
+                return Ok(resp);
+            }
+            Err(e) => {
+                let delay = retry_delay.next_delay(rng);
+                debug!(
+                    "request {req:?} to {endpoints:?} failed: {e}, trying next in {}s",
+                    delay.as_secs()
+                );
+                err.push(e);
+                tokio::time::sleep(delay).await;
+            }
+        }
+    }
+
+    // All attempts have failed, give up and return the errors.
+    Err(err)
+}
+
 /// Runs forever in the current task, performing the core operation of a directory mirror.
 ///
 /// This function runs forever in the current task, continously downloading
@@ -434,11 +549,24 @@ mod test {
     #![allow(clippy::useless_vec)]
     #![allow(clippy::needless_pass_by_value)]
     //! <!-- @@ end test lint list maintained by maint/add_warning @@ -->
+    use std::{
+        io::ErrorKind,
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+    };
+
     use crate::database;
 
     use super::*;
     use lazy_static::lazy_static;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
     use tor_basic_utils::test_rng::testing_rng;
+    use tor_dirclient::{request::ConsensusRequest, RequestError};
     use tor_dircommon::config::DirToleranceBuilder;
 
     lazy_static! {
@@ -665,5 +793,151 @@ mod test {
                         .into_unix_time()
             );
         }
+    }
+
+    /// Testing a request that is immediately successful.
+    #[tokio::test]
+    async fn request_legit() {
+        let server = TcpListener::bind("[::]:0").await.unwrap();
+        let server_addr = server.local_addr().unwrap();
+
+        tokio::task::spawn(async move {
+            let mut conn = server.accept().await.unwrap().0;
+            let mut buf = vec![0; 1024];
+            let _ = conn.read(&mut buf).await.unwrap();
+            conn.write_all(b"HTTP/1.0 200 OK\r\nContent-Length: 3\r\n\r\nfoo")
+                .await
+                .unwrap();
+        });
+
+        let resp = request_multi(
+            &vec![vec![server_addr]],
+            &ConsensusRequest::new(ConsensusFlavor::Plain),
+            &mut testing_rng(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(resp, b"foo");
+    }
+
+    /// Testing for a request that initially fails by returning a 404 but later succeeds.
+    #[tokio::test]
+    async fn request_fail_but_succeed() {
+        let mut server_addrs = Vec::new();
+        let requ_counter = Arc::new(AtomicUsize::new(0));
+        for _ in 0..2 {
+            let server = TcpListener::bind("[::]:0").await.unwrap();
+            let server_addr = server.local_addr().unwrap();
+            let requ_counter = requ_counter.clone();
+            server_addrs.push(vec![server_addr]);
+
+            tokio::task::spawn(async move {
+                loop {
+                    let (mut conn, _) = server.accept().await.unwrap();
+
+                    // This read is important!
+                    // Otherwise this server will terminate the connection with
+                    // RST instead of FIN, causing everything to fail.
+                    let mut buf = vec![0; 1024];
+                    let _ = conn.read(&mut buf).await.unwrap();
+
+                    let cur_req = requ_counter.fetch_add(1, Ordering::AcqRel);
+
+                    if cur_req == 0 {
+                        // Send a failure.
+                        conn.write_all(b"HTTP/1.0 404 Not Found\r\n\r\n")
+                            .await
+                            .unwrap();
+                    } else if cur_req == 1 {
+                        // Send a success.
+                        conn.write_all(b"HTTP/1.0 200 OK\r\nContent-Length: 3\r\n\r\nfoo")
+                            .await
+                            .unwrap();
+                    } else {
+                        unreachable!()
+                    }
+                }
+            });
+        }
+
+        let resp = request_multi(
+            &server_addrs,
+            &ConsensusRequest::new(ConsensusFlavor::Plain),
+            &mut testing_rng(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(resp, b"foo");
+    }
+
+    /// Request that fails all the time.
+    #[tokio::test]
+    async fn request_fail_ultimately() {
+        let mut server_addrs = Vec::new();
+        for _ in 0..2 {
+            let server = TcpListener::bind("[::]:0").await.unwrap();
+            let server_addr = server.local_addr().unwrap();
+            server_addrs.push(vec![server_addr]);
+
+            tokio::task::spawn(async move {
+                loop {
+                    let _ = server.accept().await.unwrap();
+                }
+            });
+        }
+
+        let errs = request_multi(
+            &server_addrs,
+            &ConsensusRequest::new(ConsensusFlavor::Plain),
+            &mut testing_rng(),
+        )
+        .await
+        .unwrap_err();
+
+        // This is just a longer loop to assert all errors are connection resets.
+        for err in errs {
+            match err {
+                AuthorityCommunicationError::RequestFailed(e) => match e.error {
+                    RequestError::IoError(io) => match io.kind() {
+                        ErrorKind::ConnectionReset => {}
+                        e => unreachable!("{e}"),
+                    },
+                    e => unreachable!("{e}"),
+                },
+                e => unreachable!("{e}"),
+            };
+        }
+    }
+
+    /// Stress out the retry algorithm by letting a timeout kill it.
+    #[tokio::test]
+    async fn request_fail_timeout() {
+        let mut servers = Vec::new();
+        let mut addrs = Vec::new();
+
+        for _ in 0..8 {
+            let server = TcpListener::bind("[::]:0").await.unwrap();
+            addrs.push(vec![server.local_addr().unwrap()]);
+            servers.push(server);
+        }
+
+        let _elapsed = tokio::time::timeout(
+            Duration::from_secs(5),
+            request_multi(
+                &addrs,
+                &ConsensusRequest::new(ConsensusFlavor::Plain),
+                &mut testing_rng(),
+            ),
+        )
+        .await
+        .unwrap_err();
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn empty_endpoints() {
+        let _ = request_single(&Vec::new(), &ConsensusRequest::new(ConsensusFlavor::Plain)).await;
     }
 }
