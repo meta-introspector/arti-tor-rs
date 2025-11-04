@@ -314,6 +314,7 @@ impl InertTorClient {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn generate_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -343,6 +344,7 @@ impl InertTorClient {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn rotate_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -372,6 +374,7 @@ impl InertTorClient {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn insert_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -396,6 +399,7 @@ impl InertTorClient {
     ///
     /// See [`TorClient::get_service_discovery_key`].
     #[cfg(all(feature = "onion-service-client", feature = "experimental-api"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn get_service_discovery_key(
         &self,
         hsid: HsId,
@@ -1855,6 +1859,7 @@ impl<R: Runtime> TorClient<R> {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn rotate_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -1888,6 +1893,7 @@ impl<R: Runtime> TorClient<R> {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn insert_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -1907,6 +1913,7 @@ impl<R: Runtime> TorClient<R> {
     ///
     /// This function does not require the `TorClient` to be running or bootstrapped.
     #[cfg(all(feature = "onion-service-client", feature = "experimental-api"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn get_service_discovery_key(
         &self,
         hsid: HsId,

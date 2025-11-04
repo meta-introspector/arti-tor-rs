@@ -10,6 +10,7 @@ pub mod proxied;
 pub(crate) use default::DefaultTransport;
 
 #[cfg(feature = "pt-client")]
+#[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
 pub use proxied::ExternalProxyPlugin;
 pub use proxied::ProxyError;
 use tor_rtcompat::StreamOps;
