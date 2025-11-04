@@ -1,6 +1,36 @@
 //! Error module for `tor-dirserver`.
 
 use thiserror::Error;
+use tor_dirclient::RequestFailedError;
+
+/// An error while communicating with a directory authority.
+///
+/// This error should be returned by all functions that download or upload
+/// resources to authorities, in other words: every function that interacts or
+/// communicates with a directory authority.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub(crate) enum AuthorityCommunicationError {
+    /// There has been an I/O error.
+    #[error("I/O error: {0}")]
+    IO(#[from] std::io::Error),
+
+    /// The request failed according to [`tor_dirclient`].
+    ///
+    /// This can have various reasons, all of them outlined in
+    /// [`RequestFailedError`].
+    ///
+    /// It contains a [`Box`] because [`RequestFailedError`] is significantly
+    /// larger than the other enum members, thereby greatly increasing the
+    /// overall size.  This is already tracked as a TODO in the respective
+    /// structure.
+    #[error("error performing directory request: {0}")]
+    RequestFailed(#[from] Box<RequestFailedError>),
+
+    /// An internal error.
+    #[error("internal error")]
+    Bug(#[from] tor_error::Bug),
+}
 
 /// An error while interacting with a database.
 ///
