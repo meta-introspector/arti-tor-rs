@@ -196,9 +196,8 @@ pub(crate) mod net {
 // ==============================
 
 use crate::traits::*;
+use futures::Future;
 use futures::task::{FutureObj, Spawn, SpawnError};
-use futures::{Future, FutureExt};
-use std::pin::Pin;
 use std::time::Duration;
 
 /// Type to wrap `smol::Executor`.
@@ -217,10 +216,34 @@ pub fn create_runtime() -> SmolRuntime {
     }
 }
 
+/// Wrapper around an `async_io::Timer` future.
+/// We use this wrapper so that we can implement SleepFuture on it.
+pub struct SmolSleep(std::pin::Pin<Box<async_io::Timer>>);
+
+impl Future for SmolSleep {
+    type Output = ();
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        match self.get_mut().0.as_mut().poll(cx) {
+            std::task::Poll::Ready(_) => std::task::Poll::Ready(()),
+            std::task::Poll::Pending => std::task::Poll::Pending,
+        }
+    }
+}
+
+impl SleepFuture for SmolSleep {
+    fn reset(self: std::pin::Pin<&mut Self>, instant: std::time::Instant) {
+        self.get_mut().0.as_mut().set_at(instant);
+    }
+}
+
 impl SleepProvider for SmolRuntime {
-    type SleepFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+    type SleepFuture = SmolSleep;
     fn sleep(&self, duration: Duration) -> Self::SleepFuture {
-        Box::pin(async_io::Timer::after(duration).map(|_| ()))
+        SmolSleep(Box::pin(async_io::Timer::after(duration)))
     }
 }
 

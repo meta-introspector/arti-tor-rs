@@ -15,6 +15,7 @@ use slotmap_careful::DenseSlotMap;
 
 use tor_rtcompat::CoarseInstant;
 use tor_rtcompat::CoarseTimeProvider;
+use tor_rtcompat::SleepFuture as SleepFutureTrait;
 use tor_rtcompat::SleepProvider;
 
 use crate::time_core::MockTimeCore;
@@ -230,6 +231,19 @@ impl SleepProvider for Provider {
 impl CoarseTimeProvider for Provider {
     fn now_coarse(&self) -> CoarseInstant {
         self.lock().core.coarse().now_coarse()
+    }
+}
+
+/// Implement the future for `Sleep`.
+impl SleepFutureTrait for SleepFuture {
+    fn reset(self: Pin<&mut Self>, instant: Instant) {
+        let this = self.get_mut();
+        let mut state = this.prov.lock();
+
+        let _ = state.unready.remove(&this.id);
+        state.unready.push(this.id, Reverse(instant));
+
+        state.wake_any();
     }
 }
 

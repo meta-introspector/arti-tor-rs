@@ -199,9 +199,7 @@ mod net {
 
 // ==============================
 
-use futures::{Future, FutureExt};
-use std::pin::Pin;
-use std::time::Duration;
+use futures::Future;
 
 use crate::traits::*;
 
@@ -210,10 +208,94 @@ pub fn create_runtime() -> async_executors::AsyncStd {
     async_executors::AsyncStd::new()
 }
 
+/// Wrapper around `async_io::Timer` to make it resettable.
+pub struct AsyncStdSleep {
+    /// Actual future that completes after a duration.
+    timer: async_io::Timer,
+
+    /// The waker for the task that `ResettableTimer` is running on.
+    /// We can use this after setting `completed = true` to tell
+    /// `ResettableTimer`'s task to wake up, see that `completed = true`, and
+    /// move forward.
+    waker: Option<std::task::Waker>,
+
+    /// Whether or not the timer has elapsed.
+    completed: bool,
+}
+
+// Implementation to construct an new future when
+// we want to reset the duration.
+// This emulation is needed because `async-std` does not
+// support resetting the current future.
+impl AsyncStdSleep {
+    /// Create a new `AsyncStdSleep` that completes after `duration`.
+    pub fn new(duration: std::time::Duration) -> Self {
+        Self {
+            timer: async_io::Timer::after(duration),
+            waker: None,
+            completed: false,
+        }
+    }
+}
+
+// Make `AsyncStdSleep` implement a future.
+impl Future for AsyncStdSleep {
+    type Output = ();
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        // Check if timer is already completed.
+        if self.completed {
+            return std::task::Poll::Ready(());
+        }
+
+        // Poll the underlying future (the async_io timer).
+        match std::pin::Pin::new(&mut self.timer).poll(cx) {
+            std::task::Poll::Ready(_) => {
+                // Mark as ready so other tasks polling `AsyncStdSleep` can see the completion status.
+                self.completed = true;
+                std::task::Poll::Ready(())
+            }
+            std::task::Poll::Pending => {
+                // Set waker so that we can wake up the current task
+                // when the timer has completed, ensuring that the future is polled
+                // again and sees that `completed = true`.
+                //
+                // We use `will_wake` to avoid cloning the waker unnecessarily.
+                if self
+                    .waker
+                    .as_ref()
+                    .is_none_or(|old| !old.will_wake(cx.waker()))
+                {
+                    self.waker = Some(cx.waker().clone());
+                }
+
+                std::task::Poll::Pending
+            }
+        }
+    }
+}
+
+impl SleepFuture for AsyncStdSleep {
+    // Reset the timer to complete after `duration` from now.
+    fn reset(mut self: std::pin::Pin<&mut Self>, instant: std::time::Instant) {
+        self.timer =
+            async_io::Timer::after(instant.saturating_duration_since(std::time::Instant::now()));
+        self.completed = false;
+
+        // Wake up the task that `AsyncStdSleep` is running on, if there is one.
+        if let Some(waker) = &self.waker {
+            waker.wake_by_ref();
+        }
+    }
+}
+
 impl SleepProvider for async_executors::AsyncStd {
-    type SleepFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
-    fn sleep(&self, duration: Duration) -> Self::SleepFuture {
-        Box::pin(async_io::Timer::after(duration).map(|_| ()))
+    type SleepFuture = AsyncStdSleep;
+    fn sleep(&self, duration: std::time::Duration) -> Self::SleepFuture {
+        AsyncStdSleep::new(duration)
     }
 }
 

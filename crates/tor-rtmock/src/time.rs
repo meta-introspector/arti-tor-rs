@@ -28,7 +28,9 @@ use tracing::trace;
 
 use std::collections::HashSet;
 use std::fmt::Formatter;
-use tor_rtcompat::{CoarseInstant, CoarseTimeProvider, SleepProvider};
+use tor_rtcompat::{
+    CoarseInstant, CoarseTimeProvider, SleepFuture as SleepFutureTrait, SleepProvider,
+};
 
 use crate::time_core::MockTimeCore;
 
@@ -570,6 +572,15 @@ impl Future for Sleeping {
             // dbg!(provider.sleepers.len());
         }
         Poll::Pending
+    }
+}
+
+// Allow resetting the sleep future to a new time.
+impl SleepFutureTrait for Sleeping {
+    fn reset(self: Pin<&mut Self>, instant: Instant) {
+        let this = self.get_mut();
+        this.when = instant;
+        this.inserted = false;
     }
 }
 
