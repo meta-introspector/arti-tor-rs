@@ -390,6 +390,10 @@ async fn request_single<Req: Requestable + Debug, SP: SleepProvider>(
 /// For retrying failed downloads, the [`RetryDelay`] timeout performs the
 /// complicated part.  See its documentation.
 ///
+/// As for the amount of contacted authorities: This function will try all.
+/// It means that it will make `authorities.len()` attempts before failing for
+/// good.
+///
 /// # Specifications
 ///
 /// * <https://spec.torproject.org/dir-spec/client-operation.html#retrying-failed-downloads>
