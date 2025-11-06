@@ -330,16 +330,16 @@ fn calculate_sync_timeout<R: Rng>(
 /// A single authority consists of multiple endpoints, which we will try in a
 /// concurrent round-robin fashion, taking the first one that succeeds.  This is
 /// implemented as a part of [`tokio`], as specified in [`TcpStream::connect()`].
-///
-/// # Panics
-///
-/// This function panics if `endpoints` is empty.
 async fn request_single<Req: Requestable + Debug>(
     endpoints: &[SocketAddr],
     req: &Req,
 ) -> Result<Vec<u8>, AuthorityCommunicationError> {
-    assert!(!endpoints.is_empty());
-    let rt = PreferredRuntime::current().expect("outside of tokio?");
+    // This check is important because tokio will panic otherwise.
+    if endpoints.is_empty() {
+        return Err(AuthorityCommunicationError::Bug(internal!(
+            "empty endpoints?"
+        )));
+    }
 
     // Fortunately, Tokio's TcpStream::connect already offers round-robin.
     let stream = TcpStream::connect(&endpoints).await?;
