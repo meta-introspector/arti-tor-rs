@@ -6531,6 +6531,7 @@ name = "tor-config"
 version = "0.36.0"
 dependencies = [
  "amplify",
+ "assert_matches",
  "cfg-if",
  "derive-deftly",
  "derive_builder_fork_arti",
@@ -6539,6 +6540,7 @@ dependencies = [
  "figment",
  "fs-mistrust",
  "futures",
+ "humantime-serde",
  "itertools 0.14.0",
  "notify",
  "paste",
