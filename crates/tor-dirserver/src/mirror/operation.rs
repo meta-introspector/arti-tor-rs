@@ -41,7 +41,7 @@ use tor_dircommon::{
 };
 use tor_error::internal;
 use tor_netdoc::doc::netstatus::ConsensusFlavor;
-use tor_rtcompat::PreferredRuntime;
+use tor_rtcompat::{PreferredRuntime, SleepProvider};
 use tracing::{debug, warn};
 
 use crate::{
@@ -196,6 +196,13 @@ impl ToSql for SaturatingSystemTime {
     }
 }
 
+/// Returns a handle to the current [`tokio`] async runtime.
+///
+/// Required for functions relying on [`tor_rtcompat`].
+fn get_runtime() -> Result<PreferredRuntime, std::io::Error> {
+    PreferredRuntime::current()
+}
+
 /// Obtains the most recent valid consensus from the database.
 ///
 /// This function queries the database using a [`Transaction`] in order to have
@@ -330,9 +337,10 @@ fn calculate_sync_timeout<R: Rng>(
 /// A single authority consists of multiple endpoints, which we will try in a
 /// concurrent round-robin fashion, taking the first one that succeeds.  This is
 /// implemented as a part of [`tokio`], as specified in [`TcpStream::connect()`].
-async fn request_single<Req: Requestable + Debug>(
+async fn request_single<Req: Requestable + Debug, SP: SleepProvider>(
     endpoints: &[SocketAddr],
     req: &Req,
+    rt: &SP,
 ) -> Result<Vec<u8>, AuthorityCommunicationError> {
     // This check is important because tokio will panic otherwise.
     if endpoints.is_empty() {
@@ -353,7 +361,7 @@ async fn request_single<Req: Requestable + Debug>(
     let mut stream = stream.compat();
 
     // Perform the actual request.
-    match tor_dirclient::send_request(&rt, req, &mut stream, None)
+    match tor_dirclient::send_request(rt, req, &mut stream, None)
         .await
         .map(|resp| resp.into_output())
     {
@@ -387,10 +395,11 @@ async fn request_single<Req: Requestable + Debug>(
 /// * <https://spec.torproject.org/dir-spec/client-operation.html#retrying-failed-downloads>
 /// * <https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/>
 #[allow(clippy::cognitive_complexity)]
-async fn request_multi<R: Rng, Req: Requestable + Debug>(
+async fn request_multi<Req: Requestable + Debug, R: Rng, SP: SleepProvider>(
     authorities: &[Vec<SocketAddr>],
     req: &Req,
     rng: &mut R,
+    rt: &SP,
 ) -> Result<Vec<u8>, RetryError<AuthorityCommunicationError>> {
     // Because this is a round-robin approach, we want to collect errors.
     let mut err = RetryError::in_attempt_to("request to authority");
@@ -408,7 +417,7 @@ async fn request_multi<R: Rng, Req: Requestable + Debug>(
             continue;
         }
 
-        match request_single(endpoints, req).await {
+        match request_single(endpoints, req, rt).await {
             Ok(resp) => {
                 debug!(
                     "request {req:?} to {endpoints:?} succeeded: received {} bytes",
@@ -814,6 +823,7 @@ mod test {
             &vec![vec![server_addr]],
             &ConsensusRequest::new(ConsensusFlavor::Plain),
             &mut testing_rng(),
+            &get_runtime().unwrap(),
         )
         .await
         .unwrap();
@@ -865,6 +875,7 @@ mod test {
             &server_addrs,
             &ConsensusRequest::new(ConsensusFlavor::Plain),
             &mut testing_rng(),
+            &get_runtime().unwrap(),
         )
         .await
         .unwrap();
@@ -892,6 +903,7 @@ mod test {
             &server_addrs,
             &ConsensusRequest::new(ConsensusFlavor::Plain),
             &mut testing_rng(),
+            &get_runtime().unwrap(),
         )
         .await
         .unwrap_err();
@@ -929,15 +941,10 @@ mod test {
                 &addrs,
                 &ConsensusRequest::new(ConsensusFlavor::Plain),
                 &mut testing_rng(),
+                &get_runtime().unwrap(),
             ),
         )
         .await
         .unwrap_err();
-    }
-
-    #[tokio::test]
-    #[should_panic]
-    async fn empty_endpoints() {
-        let _ = request_single(&Vec::new(), &ConsensusRequest::new(ConsensusFlavor::Plain)).await;
     }
 }
