@@ -43,7 +43,6 @@ use tracing::info;
 ///    fs-safe on all systems.
 ///
 /// NEVER use user-controlled or remote-controlled data for your keys.
-#[cfg_attr(docsrs, doc(cfg(not(target_arch = "wasm32"))))]
 #[derive(Clone, Debug)]
 pub struct FsStateMgr {
     /// Inner reference-counted object.

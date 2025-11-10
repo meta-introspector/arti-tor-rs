@@ -43,13 +43,6 @@ use std::{
 /// [aws-lc-rs]: https://github.com/aws/aws-lc-rs
 /// [aws-lc-license]: https://github.com/aws/aws-lc/issues/2203
 /// [all-providers]: https://docs.rs/rustls/latest/rustls/#cryptography-providers
-#[cfg_attr(
-    docsrs,
-    doc(cfg(all(
-        feature = "rustls",
-        any(feature = "tokio", feature = "async-std", feature = "smol")
-    )))
-)]
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct RustlsProvider {

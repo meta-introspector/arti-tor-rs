@@ -314,14 +314,7 @@ impl InertTorClient {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "onion-service-client",
-            feature = "experimental-api",
-            feature = "keymgr"
-        )))
-    )]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn generate_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -351,14 +344,6 @@ impl InertTorClient {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "onion-service-client",
-            feature = "experimental-api",
-            feature = "keymgr"
-        )))
-    )]
     pub fn rotate_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -388,14 +373,7 @@ impl InertTorClient {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "onion-service-client",
-            feature = "experimental-api",
-            feature = "keymgr"
-        )))
-    )]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn insert_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -420,10 +398,7 @@ impl InertTorClient {
     ///
     /// See [`TorClient::get_service_discovery_key`].
     #[cfg(all(feature = "onion-service-client", feature = "experimental-api"))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(feature = "onion-service-client", feature = "experimental-api")))
-    )]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn get_service_discovery_key(
         &self,
         hsid: HsId,
@@ -449,14 +424,6 @@ impl InertTorClient {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "onion-service-client",
-            feature = "experimental-api",
-            feature = "keymgr"
-        )))
-    )]
     pub fn remove_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -643,7 +610,6 @@ impl StreamPrefs {
     /// When this option is set, we will only pick exit relays that
     /// have an IP address that matches the country in our GeoIP database.
     #[cfg(feature = "geoip")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "geoip")))]
     pub fn exit_country(&mut self, country_code: CountryCode) -> &mut Self {
         self.country_code = Some(country_code);
         self
@@ -1885,14 +1851,6 @@ impl<R: Runtime> TorClient<R> {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "onion-service-client",
-            feature = "experimental-api",
-            feature = "keymgr"
-        )))
-    )]
     pub fn generate_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -1928,14 +1886,7 @@ impl<R: Runtime> TorClient<R> {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "onion-service-client",
-            feature = "experimental-api",
-            feature = "keymgr"
-        )))
-    )]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn rotate_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -1969,14 +1920,7 @@ impl<R: Runtime> TorClient<R> {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "onion-service-client",
-            feature = "experimental-api",
-            feature = "keymgr"
-        )))
-    )]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn insert_service_discovery_key(
         &self,
         selector: KeystoreSelector,
@@ -1996,10 +1940,7 @@ impl<R: Runtime> TorClient<R> {
     ///
     /// This function does not require the `TorClient` to be running or bootstrapped.
     #[cfg(all(feature = "onion-service-client", feature = "experimental-api"))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(feature = "onion-service-client", feature = "experimental-api")))
-    )]
+    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn get_service_discovery_key(
         &self,
         hsid: HsId,
@@ -2020,14 +1961,6 @@ impl<R: Runtime> TorClient<R> {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "onion-service-client",
-            feature = "experimental-api",
-            feature = "keymgr"
-        )))
-    )]
     pub fn remove_service_discovery_key(
         &self,
         selector: KeystoreSelector,

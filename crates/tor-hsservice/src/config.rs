@@ -17,7 +17,6 @@ pub mod restricted_discovery;
 #[cfg(not(feature = "restricted-discovery"))]
 // Use cfg(all()) to prevent this from being documented as
 // "Available on non-crate feature `restricted-discovery` only"
-#[cfg_attr(docsrs, doc(cfg(all())))]
 pub(crate) mod restricted_discovery;
 
 /// Configuration for one onion service.

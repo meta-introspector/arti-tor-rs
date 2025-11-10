@@ -18,7 +18,6 @@ ns_use_this_variety! {
 
 /// A Builder object for creating a RouterStatus and adding it to a
 /// consensus.
-#[cfg_attr(docsrs, doc(cfg(feature = "build_docs")))]
 #[derive(Debug, Clone)]
 pub struct RouterStatusBuilder {
     /// See [`RouterStatus::nickname`].

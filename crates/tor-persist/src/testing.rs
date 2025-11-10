@@ -10,7 +10,6 @@ use std::sync::{Arc, Mutex};
 /// without having to store anything to disk.
 ///
 /// Only available when this crate is built with the `testing` feature.
-#[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 #[derive(Clone, Debug)]
 pub struct TestingStateMgr {
     /// Inner reference-counted storage.

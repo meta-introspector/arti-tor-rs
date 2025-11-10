@@ -24,10 +24,8 @@ pub(crate) mod raw;
 
 pub use data::{DataReader, DataStream, DataWriter};
 #[cfg(feature = "hs-service")]
-#[cfg_attr(docsrs, doc(cfg(feature = "hs-service")))]
 pub(crate) use incoming::IncomingCmdChecker;
 #[cfg(feature = "hs-service")]
-#[cfg_attr(docsrs, doc(cfg(feature = "hs-service")))]
 pub use incoming::{
     IncomingStream, IncomingStreamRequest, IncomingStreamRequestContext,
     IncomingStreamRequestDisposition, IncomingStreamRequestFilter,
@@ -43,5 +41,4 @@ pub(crate) use crate::stream::incoming::InboundDataCmdChecker;
 pub use tor_cell::relaycell::msg::IpVersionPreference;
 
 #[cfg(feature = "stream-ctrl")]
-#[cfg_attr(docsrs, doc(cfg(feature = "stream-ctrl")))]
 pub use {ctrl::ClientStreamCtrl, data::ClientDataStreamCtrl};
