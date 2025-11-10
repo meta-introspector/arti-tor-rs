@@ -344,7 +344,6 @@ impl InertTorClient {
         feature = "experimental-api",
         feature = "keymgr"
     ))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "experimental-api")))]
     pub fn rotate_service_discovery_key(
         &self,
         selector: KeystoreSelector,
