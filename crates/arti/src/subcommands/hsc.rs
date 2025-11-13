@@ -162,6 +162,10 @@ pub(crate) struct CTorMigrateArgs {
     /// and no confirmation will be asked
     #[arg(long, short, default_value_t = false)]
     batch: bool,
+
+    /// The ID of the keystore that should be migrated.
+    #[arg(long, short)]
+    from: KeystoreId,
 }
 
 /// Run the `hsc` subcommand.
@@ -310,7 +314,7 @@ fn migrate_ctor_service_discovery_keys(
     client: &InertTorClient,
 ) -> Result<()> {
     let keymgr = client.keymgr()?;
-    let entries = keymgr.list()?.into_iter();
+    let entries = keymgr.list_by_id(&args.from)?.into_iter();
     let mut ctor_client_entries = HashMap::new();
     let mut already_present = Vec::new();
 
