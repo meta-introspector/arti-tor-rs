@@ -159,7 +159,7 @@ pub(crate) struct RemoveKeyArgs {
 #[cfg(feature = "onion-service-cli-extra")]
 pub(crate) struct CTorMigrateArgs {
     /// With this flag active no prompt will be shown
-    /// and no confirmation will be asked
+    /// and no confirmation will be asked.
     #[arg(long, short, default_value_t = false)]
     batch: bool,
 
