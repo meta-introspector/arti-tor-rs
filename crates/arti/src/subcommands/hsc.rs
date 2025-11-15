@@ -319,7 +319,7 @@ fn migrate_ctor_keys(
     let mut already_present = Vec::new();
 
     for res in entries {
-        handle_keytore_entry_result(res, &mut ctor_client_entries, &mut already_present, keymgr)?;
+        handle_keystore_entry_result(res, &mut ctor_client_entries, &mut already_present, keymgr)?;
     }
 
     if ctor_client_entries.is_empty() {
@@ -391,7 +391,7 @@ fn build_prompt_for_migrate(hsids: &Vec<HsId>) -> String {
 /// Detects whether the primary keystore already contains an entry for the service of `res`.
 /// If so, the `HsId` of the service is added to `already_present`.
 #[cfg(feature = "onion-service-cli-extra")]
-fn handle_keytore_entry_result<'a>(
+fn handle_keystore_entry_result<'a>(
     res: KeystoreEntryResult<KeystoreEntry<'a>>,
     ctor_client_entries: &mut HashMap<HsId, KeystoreEntry<'a>>,
     already_present: &mut Vec<HsId>,
