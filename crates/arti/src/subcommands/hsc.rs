@@ -202,7 +202,7 @@ fn run_key(subcommand: KeySubcommand, client: &InertTorClient) -> Result<()> {
         KeySubcommand::Rotate(args) => rotate_service_discovery_key(&args, client),
         KeySubcommand::Remove(args) => remove_service_discovery_key(&args, client),
         #[cfg(feature = "onion-service-cli-extra")]
-        KeySubcommand::CTorMigrate(args) => migrate_ctor_service_discovery_keys(&args, client),
+        KeySubcommand::CTorMigrate(args) => migrate_ctor_keys(&args, client),
     }
 }
 
@@ -309,7 +309,7 @@ fn remove_service_discovery_key(args: &RemoveKeyArgs, client: &InertTorClient) -
 
 /// Run the `hsc key ctor-migrate` subcommand.
 #[cfg(feature = "onion-service-cli-extra")]
-fn migrate_ctor_service_discovery_keys(
+fn migrate_ctor_keys(
     args: &CTorMigrateArgs,
     client: &InertTorClient,
 ) -> Result<()> {
@@ -371,7 +371,7 @@ fn get_onion_address(args: &CommonArgs) -> Result<HsId, anyhow::Error> {
     HsId::from_str(addr.trim_end()).map_err(|e| anyhow!(e))
 }
 
-/// Helper function for `migrate_ctor_service_discovery_keys`.
+/// Helper function for `migrate_ctor_keys`.
 /// Builds a prompt that will be passed to the [`prompt`] function.
 #[cfg(feature = "onion-service-cli-extra")]
 fn build_prompt_for_migrate(hsids: &Vec<HsId>) -> String {
@@ -385,7 +385,7 @@ fn build_prompt_for_migrate(hsids: &Vec<HsId>) -> String {
     p
 }
 
-/// Helper function for `migrate_ctor_service_discovery_keys`.
+/// Helper function for `migrate_ctor_keys`.
 /// Inserts the entry from `res` into `ctor_client_entries` if it is a CTor client key.
 /// If a clash occurs (multiple CTor entries for the same service) the user is warned.
 /// Detects whether the primary keystore already contains an entry for the service of `res`.
