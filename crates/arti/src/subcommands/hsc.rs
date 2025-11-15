@@ -344,8 +344,8 @@ fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<
                 );
                 prompt(&p)?
             };
-            if proceede {
-                if keymgr
+            if proceede
+                && keymgr
                     .insert(
                         key,
                         &HsClientDescEncKeypairSpecifier::new(hsid),
@@ -353,12 +353,11 @@ fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<
                         true,
                     )
                     .is_err()
-                {
-                    eprintln!(
-                        "WARNING: failed to insert key for service {}",
-                        hsid.display_redacted()
-                    );
-                }
+            {
+                eprintln!(
+                    "WARNING: failed to insert key for service {}",
+                    hsid.display_redacted()
+                );
             }
         }
     }
