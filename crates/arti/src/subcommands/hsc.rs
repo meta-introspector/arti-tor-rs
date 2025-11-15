@@ -311,12 +311,7 @@ fn remove_service_discovery_key(args: &RemoveKeyArgs, client: &InertTorClient) -
 #[cfg(feature = "onion-service-cli-extra")]
 fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<()> {
     let keymgr = client.keymgr()?;
-    let entries = keymgr.list_by_id(&args.from)?.into_iter();
-    let mut ctor_client_entries = HashMap::new();
-
-    for res in entries {
-        handle_keystore_entry_result(res, &mut ctor_client_entries)?;
-    }
+    let ctor_client_entries = detect_ctor_clashes(keymgr.list_by_id(&args.from)?.into_iter())?;
 
     if ctor_client_entries.is_empty() {
         return Err(anyhow!(
@@ -378,14 +373,16 @@ fn get_onion_address(args: &CommonArgs) -> Result<HsId, anyhow::Error> {
 }
 
 /// Helper function for `migrate_ctor_keys`.
-/// Inserts the entry from `res` into `ctor_client_entries` if it is a CTor client key.
-/// If a clash occurs (multiple CTor entries for the same service) the procedure is aborted.
+/// Detects if there is a clash (different keys for the same hidden service within the CTor keystore).
+/// Such a situation is invalid, as each service must have a unique key.
+/// If a clash is found, an error is returned.
+/// If no clashes are detected, returns a `HashMap` of keystore entries, ordered by hidden service identifier.
 #[cfg(feature = "onion-service-cli-extra")]
-fn handle_keystore_entry_result<'a>(
-    res: KeystoreEntryResult<KeystoreEntry<'a>>,
-    ctor_client_entries: &mut HashMap<HsId, KeystoreEntry<'a>>,
-) -> Result<()> {
-    if let Ok(entry) = res {
+fn detect_ctor_clashes<'a>(
+    entries: std::vec::IntoIter<KeystoreEntryResult<KeystoreEntry<'a>>>,
+) -> Result<HashMap<HsId, KeystoreEntry<'a>>> {
+    let mut ctor_client_entries = HashMap::new();
+    for entry in entries.into_iter().flatten() {
         if let KeyPath::CTor(CTorPath::ClientHsDescEncKey(hsid)) = entry.key_path() {
             if let hash_map::Entry::Occupied(_) = ctor_client_entries.entry(*hsid) {
                 return Err(anyhow!(
@@ -398,5 +395,5 @@ fn handle_keystore_entry_result<'a>(
         };
     }
 
-    Ok(())
+    Ok(ctor_client_entries)
 }
