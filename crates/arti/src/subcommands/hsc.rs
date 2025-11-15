@@ -309,10 +309,7 @@ fn remove_service_discovery_key(args: &RemoveKeyArgs, client: &InertTorClient) -
 
 /// Run the `hsc key ctor-migrate` subcommand.
 #[cfg(feature = "onion-service-cli-extra")]
-fn migrate_ctor_keys(
-    args: &CTorMigrateArgs,
-    client: &InertTorClient,
-) -> Result<()> {
+fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<()> {
     let keymgr = client.keymgr()?;
     let entries = keymgr.list_by_id(&args.from)?.into_iter();
     let mut ctor_client_entries = HashMap::new();
@@ -400,10 +397,10 @@ fn handle_keystore_entry_result<'a>(
     if let Ok(entry) = res {
         if let KeyPath::CTor(CTorPath::ClientHsDescEncKey(hsid)) = entry.key_path() {
             if let hash_map::Entry::Occupied(_) = ctor_client_entries.entry(*hsid) {
-                eprintln!(
-                    "WARNING: Multiple keys exist for service {}; ctor-migrate uses only one.",
+                return Err(anyhow!(
+                    "Multiple keys exist for service {}, ctor-migrate uses only one.",
                     hsid.display_redacted()
-                );
+                ));
             } else {
                 ctor_client_entries.insert(*hsid, entry.clone());
                 let mut addr = hsid.display_unredacted().to_string();
