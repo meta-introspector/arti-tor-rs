@@ -384,7 +384,7 @@ fn build_prompt_for_migrate(hsids: &Vec<HsId>) -> String {
 
 /// Helper function for `migrate_ctor_keys`.
 /// Inserts the entry from `res` into `ctor_client_entries` if it is a CTor client key.
-/// If a clash occurs (multiple CTor entries for the same service) the user is warned.
+/// If a clash occurs (multiple CTor entries for the same service) the procedure is aborted.
 /// Detects whether the primary keystore already contains an entry for the service of `res`.
 /// If so, the `HsId` of the service is added to `already_present`.
 #[cfg(feature = "onion-service-cli-extra")]
