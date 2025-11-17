@@ -313,13 +313,7 @@ fn remove_service_discovery_key(args: &RemoveKeyArgs, client: &InertTorClient) -
 #[cfg(feature = "onion-service-cli-extra")]
 fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<()> {
     let keymgr = client.keymgr()?;
-    let ctor_client_entries = detect_ctor_clashes(keymgr.list_by_id(&args.from)?.into_iter())?;
-
-    if ctor_client_entries.is_empty() {
-        return Err(anyhow!(
-            "No CTor client keys found in any of the available keystores."
-        ));
-    }
+    let ctor_client_entries = read_ctor_keys(keymgr.list_by_id(&args.from)?.into_iter())?;
 
     let arti_keystore_id = KeystoreId::from_str("arti")
         .map_err(|_| anyhow!("Default arti keystore ID is not valid?!"))?;
@@ -380,7 +374,7 @@ fn get_onion_address(args: &CommonArgs) -> Result<HsId, anyhow::Error> {
 /// If a clash is found, an error is returned.
 /// If no clashes are detected, returns a `HashMap` of keystore entries, ordered by hidden service identifier.
 #[cfg(feature = "onion-service-cli-extra")]
-fn detect_ctor_clashes<'a>(
+fn read_ctor_keys<'a>(
     entries: std::vec::IntoIter<KeystoreEntryResult<KeystoreEntry<'a>>>,
 ) -> Result<HashMap<HsId, KeystoreEntry<'a>>> {
     let mut ctor_client_entries = HashMap::new();
@@ -395,6 +389,12 @@ fn detect_ctor_clashes<'a>(
                 ctor_client_entries.insert(*hsid, entry.clone());
             }
         };
+    }
+
+    if ctor_client_entries.is_empty() {
+        return Err(anyhow!(
+            "No CTor client keys found in any of the available keystores."
+        ));
     }
 
     Ok(ctor_client_entries)
