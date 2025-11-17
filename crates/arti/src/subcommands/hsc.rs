@@ -313,7 +313,7 @@ fn remove_service_discovery_key(args: &RemoveKeyArgs, client: &InertTorClient) -
 #[cfg(feature = "onion-service-cli-extra")]
 fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<()> {
     let keymgr = client.keymgr()?;
-    let ctor_client_entries = read_ctor_keys(keymgr.list_by_id(&args.from)?.into_iter())?;
+    let ctor_client_entries = read_ctor_keys(keymgr.list_by_id(&args.from)?.into_iter(), args)?;
 
     let arti_keystore_id = KeystoreId::from_str("arti")
         .map_err(|_| anyhow!("Default arti keystore ID is not valid?!"))?;
@@ -380,6 +380,7 @@ fn get_onion_address(args: &CommonArgs) -> Result<HsId, anyhow::Error> {
 #[cfg(feature = "onion-service-cli-extra")]
 fn read_ctor_keys<'a>(
     entries: std::vec::IntoIter<KeystoreEntryResult<KeystoreEntry<'a>>>,
+    args: &CTorMigrateArgs,
 ) -> Result<HashMap<HsId, KeystoreEntry<'a>>> {
     let mut ctor_client_entries = HashMap::new();
     for entry in entries.into_iter().flatten() {
