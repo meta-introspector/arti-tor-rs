@@ -386,7 +386,7 @@ fn read_ctor_keys<'a>(
         if let KeyPath::CTor(CTorPath::ClientHsDescEncKey(hsid)) = entry.key_path() {
             if let hash_map::Entry::Occupied(_) = ctor_client_entries.entry(*hsid) {
                 return Err(anyhow!(
-                    "Multiple keys exist for service {}, ctor-migrate uses only one.",
+                    "Invalid C Tor keystore (multiple keys exist for service {})",
                     hsid.display_redacted()
                 ));
             } else {
