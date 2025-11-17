@@ -397,7 +397,8 @@ fn read_ctor_keys<'a>(
 
     if ctor_client_entries.is_empty() {
         return Err(anyhow!(
-            "No CTor client keys found in any of the available keystores."
+            "No CTor client keys found in keystore {}",
+            args.from,
         ));
     }
 
