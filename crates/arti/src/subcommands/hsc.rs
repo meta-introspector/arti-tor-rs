@@ -164,6 +164,8 @@ pub(crate) struct CTorMigrateArgs {
     batch: bool,
 
     /// The ID of the keystore that should be migrated.
+    // TODO: The command should detect if the ID provided belongs to a CTor keystore and return an
+    // error if it does not.
     #[arg(long, short)]
     from: KeystoreId,
 }
