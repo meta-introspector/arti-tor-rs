@@ -57,7 +57,7 @@ pub(crate) enum KeySubcommand {
     #[command(arg_required_else_help = true)]
     Remove(RemoveKeyArgs),
 
-    /// Migrate service discovery keys from the registered CTor keystore to the primary
+    /// Migrate service discovery keys from a registered CTor keystore to the primary
     /// keystore
     #[cfg(feature = "onion-service-cli-extra")]
     #[command(name = "ctor-migrate")]
