@@ -319,7 +319,7 @@ fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<
         .map_err(|_| anyhow!("Default arti keystore ID is not valid?!"))?;
     for (hsid, entry) in ctor_client_entries {
         if let Ok(Some(key)) = keymgr.get_entry::<HsClientDescEncKeypair>(&entry) {
-            let proceede = if args.batch
+            let proceed = if args.batch
                 || keymgr
                     .get_from::<HsClientDescEncKeypair>(
                         &HsClientDescEncKeypairSpecifier::new(hsid),
@@ -335,7 +335,7 @@ fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<
                 );
                 prompt(&p)?
             };
-            if proceede
+            if proceed
                 && keymgr
                     .insert(
                         key,
