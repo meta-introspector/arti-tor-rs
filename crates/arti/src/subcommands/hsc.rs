@@ -323,7 +323,7 @@ fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<
                 || keymgr
                     .get_from::<HsClientDescEncKeypair>(
                         &HsClientDescEncKeypairSpecifier::new(hsid),
-                        &KeystoreId::from_str("arti")?,
+                        &arti_keystore_id,
                     )?
                     .is_none()
             {
