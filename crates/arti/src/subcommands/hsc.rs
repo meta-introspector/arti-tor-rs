@@ -369,6 +369,7 @@ fn get_onion_address(args: &CommonArgs) -> Result<HsId, anyhow::Error> {
 }
 
 /// Helper function for `migrate_ctor_keys`.
+///
 /// Parses and returns the client keys from the CTor keystore identified by `--from` CLI flag.
 /// Detects if there is a clash (different keys for the same hidden service within
 /// the CTor keystore).
