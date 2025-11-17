@@ -85,22 +85,28 @@ See `arti hsc key remove --help` for more information.
 
 ## Migrate service discovery keys from CTor to Arti
 
-Service discovery keys contained in the registered CTor keystore can be migrated
-to Arti using the command `hsc ctor-migrate`.
+Service discovery keys from one of the registered CTor keystores can be migrated
+to the Arti primary keystore using the `hsc ctor-migrate` command.
 
 ```ignore
-$ arti -c hsc.toml hsc ctor-migrate
+$ arti -c hsc.toml hsc ctor-migrate --from ctor-keystore-id
 ```
 
-The command detects if keys for the services corresponding to the CTor keys are
-already present in the primary keystore. If so, the user will be prompted about overwriting.
+The command detects whether keys for the services corresponding to the CTor keys
+are already present in the primary keystore. If so, the user is prompted before
+overwriting.
 
-The `ctor-migrate` command is capable of detecting if a clash occurs (multiple
-keys in the registered CTor keystore belonging to the same service). In such cases,
-the user is warned, and migration proceeds using only one of the keys. The operation
-is safe, as the original CTor keystore remains intact.
+You can disable the confirmation prompt and force overwriting using the `-b` option.
 
-You can disable the confirmation prompt and force overwriting using the `-b`
-option.
+The `hsc ctor-migrate` command can detect conflicts where multiple keys in the
+registered CTor keystore belong to the same service. This situation is invalid
+because a CTor keystore cannot contain more than one key for the same hidden
+service. In such cases, the migration is aborted.
+
+The original CTor keystore remains unchanged after the operation.
+
+> NOTE: In the future, the possibility of removing the original CTor keystore
+> may be added. Currently, this functionality is not available because registered
+> CTor keystores are considered read-only, but this may change in future releases.
 
 See `arti hsc ctor-migrate --help` for more information.
