@@ -335,20 +335,19 @@ fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<
                 );
                 prompt(&p)?
             };
-            if proceed
-                && keymgr
-                    .insert(
-                        key,
-                        &HsClientDescEncKeypairSpecifier::new(hsid),
-                        (&arti_keystore_id).into(),
-                        true,
-                    )
-                    .is_err()
-            {
-                eprintln!(
-                    "WARNING: failed to insert key for service {}",
-                    hsid.display_redacted()
+            if proceed {
+                let res = keymgr.insert(
+                    key,
+                    &HsClientDescEncKeypairSpecifier::new(hsid),
+                    (&arti_keystore_id).into(),
+                    true,
                 );
+                if res.is_err() {
+                    eprintln!(
+                        "WARNING: failed to insert key for service {}",
+                        hsid.display_redacted()
+                    );
+                }
             }
         }
     }
