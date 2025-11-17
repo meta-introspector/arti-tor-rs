@@ -369,10 +369,13 @@ fn get_onion_address(args: &CommonArgs) -> Result<HsId, anyhow::Error> {
 }
 
 /// Helper function for `migrate_ctor_keys`.
-/// Detects if there is a clash (different keys for the same hidden service within the CTor keystore).
+/// Parses and returns the client keys from the CTor keystore identified by `--from` CLI flag.
+/// Detects if there is a clash (different keys for the same hidden service within
+/// the CTor keystore).
 /// Such a situation is invalid, as each service must have a unique key.
 /// If a clash is found, an error is returned.
-/// If no clashes are detected, returns a `HashMap` of keystore entries, ordered by hidden service identifier.
+/// If no clashes are detected, returns a `HashMap` of keystore entries, ordered
+/// by hidden service identifier.
 #[cfg(feature = "onion-service-cli-extra")]
 fn read_ctor_keys<'a>(
     entries: std::vec::IntoIter<KeystoreEntryResult<KeystoreEntry<'a>>>,
