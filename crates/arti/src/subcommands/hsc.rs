@@ -10,7 +10,7 @@ use safelog::DisplayRedacted;
 use tor_rtcompat::Runtime;
 #[cfg(feature = "onion-service-cli-extra")]
 use {
-    std::collections::{HashMap, hash_map},
+    std::collections::{HashMap, hash_map::Entry},
     tor_hsclient::HsClientDescEncKeypairSpecifier,
     tor_hscrypto::pk::HsClientDescEncKeypair,
     tor_keymgr::{CTorPath, KeyPath, KeystoreEntry, KeystoreEntryResult, KeystoreId},
@@ -384,13 +384,16 @@ fn read_ctor_keys<'a>(
     let mut ctor_client_entries = HashMap::new();
     for entry in entries.into_iter().flatten() {
         if let KeyPath::CTor(CTorPath::ClientHsDescEncKey(hsid)) = entry.key_path() {
-            if let hash_map::Entry::Occupied(_) = ctor_client_entries.entry(*hsid) {
-                return Err(anyhow!(
-                    "Invalid C Tor keystore (multiple keys exist for service {})",
-                    hsid.display_redacted()
-                ));
-            } else {
-                ctor_client_entries.insert(*hsid, entry.clone());
+            match ctor_client_entries.entry(*hsid) {
+                Entry::Occupied(_) => {
+                    return Err(anyhow!(
+                        "Invalid C Tor keystore (multiple keys exist for service {})",
+                        hsid.display_redacted()
+                    ));
+                }
+                Entry::Vacant(_) => {
+                    ctor_client_entries.insert(*hsid, entry.clone());
+                }
             }
         };
     }
