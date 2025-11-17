@@ -375,7 +375,7 @@ fn get_onion_address(args: &CommonArgs) -> Result<HsId, anyhow::Error> {
 /// the CTor keystore).
 /// Such a situation is invalid, as each service must have a unique key.
 /// If a clash is found, an error is returned.
-/// If no clashes are detected, returns a `HashMap` of keystore entries, ordered
+/// If no clashes are detected, returns a `HashMap` of keystore entries, keyed
 /// by hidden service identifier.
 #[cfg(feature = "onion-service-cli-extra")]
 fn read_ctor_keys<'a>(
