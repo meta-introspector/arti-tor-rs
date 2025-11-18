@@ -154,7 +154,7 @@ pub(crate) struct RemoveKeyArgs {
     common: CommonArgs,
 }
 
-/// The arguments of the [`CTorMigrate`](KeySubcommand::CTorMigrate) subcommand.
+/// The arguments of the [`CTorMigrate`](Subcommand::CTorMigrate) subcommand.
 #[derive(Debug, Clone, Args)]
 #[cfg(feature = "onion-service-cli-extra")]
 pub(crate) struct CTorMigrateArgs {
