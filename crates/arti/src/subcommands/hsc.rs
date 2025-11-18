@@ -348,9 +348,9 @@ fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<
                     (&arti_keystore_id).into(),
                     true,
                 );
-                if res.is_err() {
+                if let Err(e) = res {
                     eprintln!(
-                        "WARNING: failed to insert key for service {}",
+                        "Failed to insert key for service {}: {e}",
                         hsid.display_redacted()
                     );
                 }
