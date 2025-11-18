@@ -398,8 +398,8 @@ fn read_ctor_keys<'a>(
                         hsid.display_redacted()
                     ));
                 }
-                Entry::Vacant(_) => {
-                    ctor_client_entries.insert(*hsid, entry.clone());
+                Entry::Vacant(v) => {
+                    v.insert(entry.clone());
                 }
             }
         };
