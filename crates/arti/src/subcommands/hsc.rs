@@ -13,7 +13,7 @@ use {
     std::collections::{HashMap, hash_map::Entry},
     tor_hsclient::HsClientDescEncKeypairSpecifier,
     tor_hscrypto::pk::HsClientDescEncKeypair,
-    tor_keymgr::{CTorPath, KeyPath, KeystoreEntry, KeystoreEntryResult, KeystoreId},
+    tor_keymgr::{CTorPath, KeyPath, KeystoreEntry, KeystoreId},
 };
 
 use std::fs::OpenOptions;
@@ -313,7 +313,14 @@ fn remove_service_discovery_key(args: &RemoveKeyArgs, client: &InertTorClient) -
 #[cfg(feature = "onion-service-cli-extra")]
 fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<()> {
     let keymgr = client.keymgr()?;
-    let ctor_client_entries = read_ctor_keys(keymgr.list_by_id(&args.from)?.into_iter(), args)?;
+    let ctor_client_entries = read_ctor_keys(
+        &keymgr
+            .list_by_id(&args.from)?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>(),
+        args,
+    )?;
 
     let arti_keystore_id = KeystoreId::from_str("arti")
         .map_err(|_| anyhow!("Default arti keystore ID is not valid?!"))?;
@@ -378,11 +385,11 @@ fn get_onion_address(args: &CommonArgs) -> Result<HsId, anyhow::Error> {
 /// by hidden service identifier.
 #[cfg(feature = "onion-service-cli-extra")]
 fn read_ctor_keys<'a>(
-    entries: std::vec::IntoIter<KeystoreEntryResult<KeystoreEntry<'a>>>,
+    entries: &[KeystoreEntry<'a>],
     args: &CTorMigrateArgs,
 ) -> Result<HashMap<HsId, KeystoreEntry<'a>>> {
     let mut ctor_client_entries = HashMap::new();
-    for entry in entries.into_iter().flatten() {
+    for entry in entries {
         if let KeyPath::CTor(CTorPath::ClientHsDescEncKey(hsid)) = entry.key_path() {
             match ctor_client_entries.entry(*hsid) {
                 Entry::Occupied(_) => {
