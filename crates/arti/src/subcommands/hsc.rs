@@ -315,6 +315,8 @@ fn migrate_ctor_keys(args: &CTorMigrateArgs, client: &InertTorClient) -> Result<
     let keymgr = client.keymgr()?;
     let ctor_client_entries = read_ctor_keys(&keymgr.list_by_id(&args.from)?, args)?;
 
+    // TODO: Simplify this logic when addressing issue #1359.
+    // See [!3390 (comment 3288090)](https://gitlab.torproject.org/tpo/core/arti/-/merge_requests/3390#note_3288090).
     let arti_keystore_id = KeystoreId::from_str("arti")
         .map_err(|_| anyhow!("Default arti keystore ID is not valid?!"))?;
     for (hsid, entry) in ctor_client_entries {
