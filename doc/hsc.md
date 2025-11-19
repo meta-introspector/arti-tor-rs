@@ -100,7 +100,6 @@ configuration file:
 [[storage.keystore.ctor.clients]]
 id = "ctor-keystore-id"
 path = "/path/to/ctor_keystore"
-
 ```
 
 ```ignore
