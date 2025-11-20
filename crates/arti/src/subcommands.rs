@@ -41,11 +41,8 @@ fn prompt(msg: &str) -> Result<bool> {
             .read_line(&mut proceed)
             .map_err(|e| anyhow!(e))?;
 
-        if proceed.trim_end() == YES {
-            return Ok(true);
-        }
-
         match proceed.trim_end().to_lowercase().as_str() {
+            YES | "y" => return Ok(true),
             NO | "n" => return Ok(false),
             _ => {
                 proceed.clear();
