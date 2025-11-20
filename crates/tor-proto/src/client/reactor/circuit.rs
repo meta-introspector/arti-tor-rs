@@ -36,8 +36,8 @@ use crate::stream::queue::{StreamQueueSender, stream_queue};
 use crate::streammap;
 use crate::tunnel::TunnelScopedCircId;
 use crate::util::err::ReactorError;
-use crate::util::notify::NotifySender;
 use crate::{ClockSkew, Error, Result};
+use tor_async_utils::notify::NotifySender;
 
 use tor_async_utils::{SinkTrySend as _, SinkTrySendError as _};
 use tor_cell::chancell::msg::{AnyChanMsg, HandshakeType, Relay};

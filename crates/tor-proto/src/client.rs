@@ -33,12 +33,12 @@ use crate::stream::cmdcheck::AnyCmdChecker;
 use crate::stream::flow_ctrl::state::StreamRateLimit;
 use crate::stream::flow_ctrl::xon_xoff::reader::XonXoffReaderCtrl;
 use crate::stream::queue::stream_queue;
-use crate::util::notify::NotifySender;
 use crate::{Error, ResolveError, Result};
 use circuit::{CIRCUIT_BUFFER_SIZE, ClientCirc, Path};
 use reactor::{
     CtrlCmd, CtrlMsg, FlowCtrlMsg, MetaCellHandler, RECV_WINDOW_INIT, STREAM_READER_BUFFER,
 };
+use tor_async_utils::notify::NotifySender;
 
 use postage::watch;
 use tor_async_utils::SinkCloseChannel as _;

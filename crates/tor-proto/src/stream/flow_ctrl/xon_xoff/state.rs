@@ -43,8 +43,8 @@ use super::reader::DrainRateRequest;
 
 use crate::stream::flow_ctrl::params::{CellCount, FlowCtrlParameters};
 use crate::stream::flow_ctrl::state::{FlowCtrlHooks, StreamRateLimit};
-use crate::util::notify::NotifySender;
 use crate::{Error, Result};
+use tor_async_utils::notify::NotifySender;
 
 #[cfg(doc)]
 use {crate::client::stream::DataStream, crate::stream::flow_ctrl::state::StreamFlowCtrl};
