@@ -80,6 +80,7 @@ pub struct KeystoreEntry<'a> {
 
 impl<'a> KeystoreEntry<'a> {
     /// Create a new `KeystoreEntry`
+    #[cfg_attr(feature = "experimental-api", visibility::make(pub))]
     pub(crate) fn new(
         key_path: KeyPath,
         key_type: KeystoreItemType,
