@@ -3,8 +3,7 @@
 We welcome new contributors!  You can get in contact with us on
 [our gitlab instance](https://gitlab.torproject.org/), or on the
 [`\#tor-dev IRC` channel on OFTC](https://www.torproject.org/contact/).
-Make sure to familiarize yourself with our
-[Code of Conduct](https://community.torproject.org/policies/code_of_conduct/).
+Make sure to familiarize yourself with our [Code of Conduct](https://community.torproject.org/policies/code_of_conduct/).
 
 The new-account process on our gitlab instance is moderated, to reduce
 spam and abuse.  (*Insert instructions for anonymous usage here*)
@@ -147,8 +146,8 @@ but is not needed otherwise.
 ## Where are some good places to start hacking?
 
 You might want to begin by looking around the
-[codebase](https://gitlab.torproject.org/tpo/core/arti/), or getting to
-know our [architecture](./doc/dev/Architecture.md).
+[codebase](https://gitlab.torproject.org/tpo/core/arti/), getting to
+know our [architecture](./doc/dev/Architecture.md), or the [Tor Specification](https://spec.torproject.org/index.html).
 
 More tests would always be great. You can look at the [coverage reports](https://tpo.pages.torproject.net/core/arti/coverage/)
 to find out what parts need the more love.
