@@ -346,7 +346,7 @@ impl From<ListenItem> for ListenItemSerde {
 /// Listen configuration is invalid
 #[derive(thiserror::Error, Debug, Clone)]
 #[non_exhaustive]
-enum CustomizableInvalidListen {
+enum InvalidCustomizableListen {
     /// Bool was `true` but that's not an address.
     #[error("Invalid listen specification: need actual addr/port, or `false`; not `true`")]
     InvalidBool,
@@ -356,14 +356,14 @@ enum CustomizableInvalidListen {
     InvalidString(#[from] std::net::AddrParseError),
 }
 impl TryFrom<ListenSerde> for CustomizableListen {
-    type Error = CustomizableInvalidListen;
+    type Error = InvalidCustomizableListen;
 
     fn try_from(l: ListenSerde) -> Result<CustomizableListen, Self::Error> {
         use ListenSerde as LS;
         Ok(match l {
             // A false value not in a list is interpreted as "none".
             LS::Bool(false) => CustomizableListen::Disabled,
-            LS::Bool(true) => return Err(CustomizableInvalidListen::InvalidBool),
+            LS::Bool(true) => return Err(InvalidCustomizableListen::InvalidBool),
             // An empty string not in a list is interpreted as "none".
             LS::One(ListenItemSerde::String(s)) if s.is_empty() => CustomizableListen::List(vec![]),
             LS::One(i) => CustomizableListen::One(i.try_into()?),
@@ -375,7 +375,7 @@ impl TryFrom<ListenSerde> for CustomizableListen {
 }
 impl ListenItemSerde {}
 impl TryFrom<ListenItemSerde> for ListenItem {
-    type Error = CustomizableInvalidListen;
+    type Error = InvalidCustomizableListen;
 
     fn try_from(i: ListenItemSerde) -> Result<ListenItem, Self::Error> {
         use ListenItem as LI;
