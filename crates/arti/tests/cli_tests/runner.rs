@@ -40,7 +40,7 @@ fn cli_tests() {
                     t.case("tests/testcases/hsc/*.toml");
                 }
             }
-            t.case("tests/testcases/hsc-common/*.md");
+            t.case("tests/testcases/hsc-common/*.toml");
             t.case("tests/testcases/hsc-common/*.md");
         } else {
             // This is not yet implemented, see #1487
