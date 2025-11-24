@@ -223,9 +223,6 @@ enum InvalidListen {
 /// but it's likely that arti-relay won't want an "auto" option for its OR port.
 #[derive(Clone, Hash, Debug, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "ListenSerde", into = "ListenSerde")]
-// If we add new variants, it *is* a breaking change.
-// We want a compile-time error, not a runtime error.
-#[allow(clippy::exhaustive_enums)]
 enum CustomizableListen {
     /// Explicitly disabled with `false`.
     Disabled,
