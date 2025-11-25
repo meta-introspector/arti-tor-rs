@@ -1,7 +1,6 @@
 //! Error module for `tor-dirserver`.
 
 use thiserror::Error;
-use tor_dirclient::RequestFailedError;
 
 /// An error while communicating with a directory authority.
 ///
@@ -15,17 +14,15 @@ pub(crate) enum AuthorityCommunicationError {
     #[error("I/O error: {0}")]
     IO(#[from] std::io::Error),
 
-    /// The request failed according to [`tor_dirclient`].
+    /// A failure related to [`tor_dirclient`].
     ///
-    /// This can have various reasons, all of them outlined in
-    /// [`RequestFailedError`].
+    /// Most likely, this will be of type [`tor_dirclient::Error::RequestFailed`],
+    /// but in order to stay compatible with `non_exhaustive` we map the error.
     ///
-    /// It contains a [`Box`] because [`RequestFailedError`] is significantly
-    /// larger than the other enum members, thereby greatly increasing the
-    /// overall size.  This is already tracked as a TODO in the respective
-    /// structure.
-    #[error("error performing directory request: {0}")]
-    RequestFailed(#[from] Box<RequestFailedError>),
+    /// The value is in a [`Box`] to satisfy `clippy::large_enum_variant`.
+    /// It is already noted in a TODO within the respective crate.
+    #[error("dirclient error: {0}")]
+    Dirclient(#[from] Box<tor_dirclient::Error>),
 
     /// An internal error.
     #[error("internal error")]

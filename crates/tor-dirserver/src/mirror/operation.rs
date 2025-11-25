@@ -366,9 +366,8 @@ async fn request_single<Req: Requestable + Debug, SP: SleepProvider>(
         .map(|resp| resp.into_output())
     {
         Ok(Ok(resp)) => Ok(resp),
-        Ok(Err(e)) => Err(Box::new(e).into()),
-        Err(tor_dirclient::Error::RequestFailed(e)) => Err(Box::new(e).into()),
-        Err(e) => Err(AuthorityCommunicationError::Bug(internal!("{e}"))),
+        Ok(Err(e)) => Err(Box::new(tor_dirclient::Error::RequestFailed(e)).into()),
+        Err(e) => Err(Box::new(e).into()),
     }
 }
 
@@ -915,15 +914,18 @@ mod test {
         // This is just a longer loop to assert all errors are connection resets.
         for err in errs {
             match err {
-                AuthorityCommunicationError::RequestFailed(e) => match e.error {
-                    RequestError::IoError(io) => match io.kind() {
-                        ErrorKind::ConnectionReset => {}
+                AuthorityCommunicationError::Dirclient(e) => match *e {
+                    tor_dirclient::Error::RequestFailed(e) => match e.error {
+                        RequestError::IoError(e) => match e.kind() {
+                            ErrorKind::ConnectionReset => {}
+                            e => unreachable!("{e}"),
+                        },
                         e => unreachable!("{e}"),
                     },
                     e => unreachable!("{e}"),
                 },
                 e => unreachable!("{e}"),
-            };
+            }
         }
     }
 
