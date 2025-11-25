@@ -59,7 +59,7 @@
 /// At this point, you start declaring the fields that should appear in the configuration.
 /// You declare them as struct fields (as usual);
 /// but to avoid mistakes, you need to specify the default behavior for each field.
-/// You typically do this this in one of the following ways:
+/// You typically do this in one of the following ways:
 ///
 /// ```
 /// # use derive_deftly::Deftly;
@@ -87,13 +87,13 @@
 /// Notes:
 /// - There is no "default" behavior for the unset fields: you need to say which one you want.
 ///   This requirement is meant to avoid programming errors.
-/// - Try to avoid using `no_default` on any configuration element that is
-///   always present with a multiplicity of one.
+/// - Try to avoid using `no_default` on any configuration element unless you truly want the user
+///   to specify it in their configuration file every time this section exists.
 ///   It's okay to use `no_default`
 ///   on something like the address of a fallback directory
 ///   (where each one needs to be fully specified)
-///   or the ()
-///   where
+///   or the nickname of an onion service
+///   (which needs to be specified for every onion service that exists).
 /// - If you use `no_default`, you will need to use [`no_impl_default`] on the structure
 ///   as a whole.
 ///
@@ -107,6 +107,8 @@
 ///
 /// [^partialeq-notest]: If you decide not to implement `PartialEq` for some reason,
 ///    you will need to use the [`no_test_default`] attribute to suppress a test that requires it.
+///    (I do not really know why you would do this.  Just implement `PartialEq`, or
+///    edit this documentation to explain why people would sometimes not want to implement it.)
 ///
 /// [`no_impl_default`]: crate::derive::doc_ref_attrs#tmeta:no_impl_default
 /// [`no_test_default`]: crate::derive::doc_ref_attrs#tmeta:no_test_default
@@ -122,11 +124,14 @@ pub mod doc_howto {}
 ///
 /// The `TorConfig` macro generates a Builder struct, with a name formed by appending
 /// `Builder` to the name of the configuration struct.
+/// That is, if the configuration struct is `MyConfig`,
+/// the macro generates `MyConfigBuilder`.
 ///
+/// The builder struct has the same visibility as the configuration struct.
 /// The builder struct has,
 /// for every ordinary field[^ordinary] of type T in the configuration struct,
 /// a field with the same name and type `Option<T>`.
-/// For every [sub-builder] field in the configuration struct of type `T``,
+/// For every [sub-builder] field in the configuration struct of type `T`,
 /// it has a field with the same name and the type `TBuilder`.
 /// These fields are private.
 ///
@@ -138,8 +143,8 @@ pub mod doc_howto {}
 /// It also has a `new()` method that calls `Default::default()`
 ///
 /// The _configuration struct_ receives a generated "builder" method,
-/// of type `fn () -> `config type`Builder`.
-/// It also delegates to the builder's `Default::default()`` method.
+/// of type `fn () -> MyConfigBuilder`.
+/// This function calls the builder's `Default::default()` method.
 ///
 /// For every ordinary[^ordinary] field of type T in the configuration struct,
 /// the builder has a **setter method** with the same name,
@@ -147,12 +152,13 @@ pub mod doc_howto {}
 /// The setter method sets the corresponding field in `self` to `Some(value)`,
 /// and returns `self``.
 ///
-/// For every [sub-builder] field of type T in the configuration struct,
+/// For every [sub-builder] field of type SubCfg in the configuration struct,
 /// the builder has an accessor method with the same name,
-/// returning `&mut TBuilder`.
+/// returning `&mut SubCfgBuilder`.
 ///
 /// The builder has a **build method**, with the name `build`,
-/// of type `fn (&self) -> Result<`config type`, ConfigBuildError>`.
+/// of type `fn (&self) -> Result<MyConfig, ConfigBuildError>`.
+/// It has the same visibility as the builder struct.
 /// For every field in the builder of value `Some(x)`,
 /// it sets the corresponding field in the configuration object to `x`.
 /// For every field in the builder of value `None`,
@@ -163,7 +169,9 @@ pub mod doc_howto {}
 /// it invokes the build method on that sub-builder,
 /// and sets the corresponding field in the configuration object to its result.
 ///
-/// A new test module is generated, with tests for the builder behavior.
+/// A new `#[cfg(test)]` module is generated, with tests for the builder behavior.
+/// This module is called `test_my_config_builder`, with `my_config` replaced with the
+/// snake-case name of your actual configuration type.
 ///
 /// [^ordinary]: For the purpose of this documentation,
 ///     a field is "ordinary" if it does not have a [sub-builder].
@@ -211,7 +219,8 @@ pub mod doc_migration {}
 /// By default, the generated Builder will implement [`serde::Deserialize`].
 /// This attribute suppresses that behavior.
 ///
-/// Using this option will prevent your
+/// Using this option will prevent your type from participating directly
+/// in the Arti configuration system.
 ///
 /// <div id="tmeta:no_impl_default">
 ///
@@ -224,7 +233,7 @@ pub mod doc_migration {}
 ///
 /// <div id="tmeta:no_test_default">
 ///
-/// ### `deftly(TorConfig(no_impl_default))` — Don't test Default for the config struct
+/// ### `deftly(TorConfig(no_test_default))` — Don't test Default for the config struct
 ///
 /// </div>
 ///
@@ -236,6 +245,9 @@ pub mod doc_migration {}
 /// The test is also omitted when [`no_impl_default`] or [`no_impl_deserialize`] is given.
 ///
 /// > Note: You must specify this option if the configuration type has any generic parameters.
+/// > Otherwise, it's best to avoid this attribute.
+/// >
+/// > TODO: We should remove this limitation if we can.
 ///
 /// <div id="tmeta:no_impl_builder_trait">
 ///
@@ -262,7 +274,7 @@ pub mod doc_migration {}
 /// #[deftly(TorConfig(attr= "derive(PartialOrd)"))]
 /// ```
 ///
-/// (See also XXX for XXX)
+/// (See also [`attr`](crate::derive::doc_ref_attrs#fmeta:attr) for fields.)
 ///
 /// <div id="tmeta:validate">
 ///
@@ -303,9 +315,9 @@ pub mod doc_migration {}
 ///
 /// <!-- TODO: Add a "see also" note. -->
 ///
-/// <div id="tmeta:post_validate">
+/// <div id="tmeta:post_build">
 ///
-/// ### `deftly(TorConfig(post_validate = ".."))` — Call a function after building
+/// ### `deftly(TorConfig(post_build = ".."))` — Call a function after building
 ///
 /// </div>
 ///
@@ -322,7 +334,7 @@ pub mod doc_migration {}
 /// # use tor_config::{derive::prelude::*, ConfigBuildError};
 /// #[derive(Clone,Debug,PartialEq,Deftly)]
 /// #[derive_deftly(TorConfig)]
-/// #[deftly(TorConfig(post_validate="FavoriteEvenNumber::must_be_even"))]
+/// #[deftly(TorConfig(post_build="FavoriteEvenNumber::must_be_even"))]
 /// pub struct FavoriteEvenNumber {
 ///     #[deftly(TorConfig(default="86"))]
 ///     my_favorite: u32,
@@ -370,7 +382,7 @@ pub mod doc_migration {}
 ///
 /// </div>
 ///
-/// By default, the `build()` method has the sam visibility as the builder struct.
+/// By default, the `build()` method has the same visibility as the builder struct.
 /// You can use this attribute to change its visibility.
 ///
 /// See also:
@@ -579,7 +591,7 @@ pub mod doc_migration {}
 ///
 /// <div id="fmeta:setter_strip_option">
 ///
-/// ### `deftly(TorConfig(setter(try_into)))` — Have the setter for `Option<T>` accept `T`
+/// ### `deftly(TorConfig(setter(strip_option)))` — Have the setter for `Option<T>` accept `T`
 ///
 /// </div>
 ///
@@ -601,6 +613,54 @@ pub mod doc_migration {}
 /// > This attribute has no effect on the generated setter or builder code.
 /// > Therefore, you will typically need to use it along with
 /// > the [`setter(skip)`] and [`build`] field attributes.
+///
+/// Example:
+///
+/// ```
+/// # #![allow(unexpected_cfgs)]
+/// # use derive_deftly::Deftly;
+/// # use tor_config::{derive::prelude::*, ConfigBuildError};
+/// #[derive(Clone,Debug,PartialEq)]
+/// pub struct ParsedValue {
+///    // ...
+/// }
+/// impl std::str::FromStr for ParsedValue {
+///     type Err = String;
+///     fn from_str(s: &str) -> Result<Self, Self::Err> {
+///         // ...
+/// #       unimplemented!()
+///     }
+/// }
+///
+/// #[derive(Clone,Debug,PartialEq,Deftly)]
+/// #[derive_deftly(TorConfig)]
+/// pub struct MyConfig {
+///     #[deftly(TorConfig(
+///         try_build = r#"Self::try_build_behavior"#,
+///         field(ty = "Option<String>"),
+///         setter(skip)
+///     ))]
+///     behavior: ParsedValue,
+/// }
+///
+/// impl MyConfigBuilder {
+///     pub fn behavior(&mut self, s: impl AsRef<str>) -> &mut Self {
+///         self.behavior = Some(s.as_ref().to_string());
+///         self
+///     }
+///     fn try_build_behavior(&self) -> Result<ParsedValue, ConfigBuildError> {
+///         self.behavior
+///             .as_ref()
+///             .map(String::as_str)
+///             .unwrap_or("Leave the macro processor. Take the cannoli.")
+///             .parse()
+///             .map_err(|problem| ConfigBuildError::Invalid {
+///                 field: "behavior".to_string(),
+///                 problem,
+///             })
+///     }
+/// }
+/// ```
 ///
 /// <div id="fmeta:field_vis">
 ///
@@ -640,6 +700,12 @@ pub mod doc_migration {}
 /// #[deftly(TorConfig(serde = r#"alias = "old_name_of_field" "#))]
 /// current_name_of_field: String,
 /// ```
+///
+/// Attributes applied with `serde` apply after any specified with
+/// [`attr`](crate::derive::doc_ref_attrs#fmeta:attr) instead.
+///
+/// > This is a convenience attribute; you could just use
+/// > [`attr`](crate::derive::doc_ref_attrs#fmeta:attr) instead.
 ///
 /// <!-- TODO: write up a list of recommended serde attributes -->
 ///
@@ -682,6 +748,10 @@ pub mod doc_migration {}
 ///     rpc_option: RpcOptionType,
 /// }
 /// ```
+///
+/// <!-- TODO: This is a warning now, since it is in general only a warning
+///      to use an option that is not recognized.
+///      We may want to provide a variant that produces an error instead. -->
 ///
 /// <div id="fmeta:no_magic">
 ///
@@ -730,6 +800,9 @@ pub mod doc_differences {}
 /// To override the special handling for a field, use the `TorConfig(no_magic)`
 /// attribute on that field.
 ///
+/// <!-- TODO: Document type requirements in general, and rename this to doc_cfg_types
+/// or something like that. -->
+///
 /// > I don't like the behavior this feature,
 /// > and I'm likely to change this entirely before I merge,
 /// > but I'm documenting it anyway for comment.
@@ -772,13 +845,19 @@ pub mod doc_special_types {}
 //   - With vec:
 //     - Include list_builder_accessors
 //     - require that list be empty
-//
+// - Decide whether to replace TorConfig with tor_config as our attr namespace id.
+// - Possibly, accept pre_build as a synonym for validate.
+// - Add a field(skip).
+// - Can I replace cfg() with a single FeatureNotSupported type, or a family of such types?
+// - derive-deftly#109 would let us have better syntax for tmeta:attr, fmeta:attr, and fmeta:serde.
+
 // Needed for fs-mistrust:
 // - Override "build" error type.
 //
 // Couldn't figure out, maybe not needed.
 // - Derive publisher_view as needed
 // - Derive Flattenable?
+//
 
 use derive_deftly::define_derive_deftly;
 
@@ -939,7 +1018,7 @@ macro_rules! bld_magic_setter_cvt {
 pub use bld_magic_setter_cvt;
 
 /// Helper: Expand to the code that should be used to convert `{e}` from type
-/// `bld_magic_type!{$t}` into $t.  Uses hne field name `{fname} to generate errors.
+/// `bld_magic_type!{$t}` into $t.  Uses the field name `{fname} to generate errors.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! bld_magic_cvt {
@@ -1337,9 +1416,9 @@ define_derive_deftly! {
                 )
             };
 
-            // Call the post_validate function to transform the result.
-            ${if tmeta(TorConfig(post_validate)) {
-                let result = ${tmeta(TorConfig(post_validate)) as path}(result)?;
+            // Call the post_build function to transform the result.
+            ${if tmeta(TorConfig(post_build)) {
+                let result = ${tmeta(TorConfig(post_build)) as path}(result)?;
             }}
 
             Ok(result)
@@ -1371,7 +1450,7 @@ define_derive_deftly! {
     }}
 
     // -------------------
-    // Implement `Default` for the confifuration type, in terms of the Builder.
+    // Implement `Default` for the configuration type, in terms of the Builder.
     // (Unless the no_impl_default attribute was present.)
 
     ${if not(tmeta(TorConfig(no_impl_default))) {
@@ -1392,7 +1471,7 @@ define_derive_deftly! {
         tmeta(TorConfig(no_test_default))))
         {
         #[cfg(test)]
-        mod $<test_ ${snake_case $tname} _default> {
+        mod $<test_ ${snake_case $tname} _builder> {
             #[test]
             // TODO: Doesn't work on generics. Do we care?
             fn test_impl_default() {
@@ -1520,7 +1599,7 @@ mod test {
         #[derive_deftly(TorConfig)]
         #[deftly(TorConfig(
             validate = "Self::check_odd",
-            post_validate = "CfgValidating::check_even"
+            post_build = "CfgValidating::check_even"
         ))]
         pub(super) struct CfgValidating {
             #[deftly(TorConfig(default = "1"))]
