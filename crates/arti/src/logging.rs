@@ -494,6 +494,28 @@ where
     Ok((layer, guard))
 }
 
+/// Check if the given path has a valid parent directory and create if it does not.
+fn ensure_parent_dir(path: &Path, mistrust: &Mistrust) -> Result<std::path::PathBuf> {
+    let directory = match path.parent() {
+        None => {
+            return Err(anyhow!(
+                "Logfile path \"{}\" did not have a parent directory",
+                path.display_lossy()
+            ));
+        }
+        Some(p) if p == Path::new("") => Path::new("."),
+        Some(d) => d,
+    };
+    mistrust.make_directory(directory).with_context(|| {
+        format!(
+            "Unable to create parent directory for logfile \"{}\"",
+            path.display_lossy()
+        )
+    })?;
+
+    Ok(directory.to_path_buf())
+}
+
 /// Try to construct a tracing [`Layer`] for all of the configured logfiles.
 ///
 /// On success, return that layer along with a list of [`WorkerGuard`]s that
