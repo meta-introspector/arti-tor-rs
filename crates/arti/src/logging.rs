@@ -363,7 +363,11 @@ where
 /// This doesn't allow for filtering, since most of our spans are exported at the trace level
 /// anyways, and filtering can easily be done when viewing the data.
 #[cfg(feature = "opentelemetry")]
-fn otel_layer<S>(config: &LoggingConfig, mistrust: &Mistrust, path_resolver: &CfgPathResolver) -> Result<impl Layer<S>>
+fn otel_layer<S>(
+    config: &LoggingConfig,
+    mistrust: &Mistrust,
+    path_resolver: &CfgPathResolver,
+) -> Result<impl Layer<S>>
 where
     S: Subscriber + for<'span> tracing_subscriber::registry::LookupSpan<'span>,
 {
