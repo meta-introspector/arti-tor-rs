@@ -481,6 +481,7 @@ where
 }
 
 /// Check if the given path has a valid parent directory and create if it does not.
+/// Returns the parent directory on success.
 fn ensure_parent_dir(path: &Path, mistrust: &Mistrust) -> Result<std::path::PathBuf> {
     let directory = match path.parent() {
         None => {
