@@ -363,7 +363,7 @@ where
 /// This doesn't allow for filtering, since most of our spans are exported at the trace level
 /// anyways, and filtering can easily be done when viewing the data.
 #[cfg(feature = "opentelemetry")]
-fn otel_layer<S>(config: &LoggingConfig, path_resolver: &CfgPathResolver) -> Result<impl Layer<S>>
+fn otel_layer<S>(config: &LoggingConfig, mistrust: &Mistrust, path_resolver: &CfgPathResolver) -> Result<impl Layer<S>>
 where
     S: Subscriber + for<'span> tracing_subscriber::registry::LookupSpan<'span>,
 {
@@ -383,10 +383,12 @@ where
         .build();
 
     let span_processor = if let Some(otel_file_config) = &config.opentelemetry.file {
+        let path = otel_file_config.path.path(path_resolver)?;
+        let _ = ensure_parent_dir(&path, mistrust)?;
         let file = std::fs::File::options()
             .create(true)
             .append(true)
-            .open(otel_file_config.path.path(path_resolver)?)?;
+            .open(path)?;
 
         let exporter = otlp_file_exporter::FileExporter::new(file, resource.clone());
 
@@ -611,7 +613,7 @@ pub(crate) fn setup_logging(
     let registry = registry.with(journald_layer(config)?);
 
     #[cfg(feature = "opentelemetry")]
-    let registry = registry.with(otel_layer(config, path_resolver)?);
+    let registry = registry.with(otel_layer(config, mistrust, path_resolver)?);
 
     #[cfg(feature = "tokio-console")]
     let registry = {
