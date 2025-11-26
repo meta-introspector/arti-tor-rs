@@ -5,5 +5,6 @@ BREAKING: `RelayFlags` is now in new `types::relay_flags` module
 BREAKING: `RouterStatus` now contains new `DocRelayFlags`.
 BREAKING: `parse2` entrypoints now take a new `ParseInput`.
 BREAKING: `parse2::MultiplicitySelector` replaces `ItemSetSelector` etc.
+BREAKING: `parse2 ItemValueParseable` `netdoc(rest, with=)` attr behaviour changed
 ADDED: Some initial support for encoding `RelayFlags`.
 ADDED: Much more API exposed in the `encode` module
