@@ -15,20 +15,13 @@
 //! You can think of this module as the one implementing the things unique
 //! to directory mirrors.
 
-use std::{
-    ops::Deref,
-    time::{Duration, SystemTime},
-};
+use std::time::{Duration, SystemTime};
 
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rand::Rng;
-use rusqlite::{
-    params,
-    types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef},
-    OptionalExtension, ToSql, Transaction,
-};
-use tor_basic_utils::RngExt;
+use rusqlite::{params, OptionalExtension, Transaction};
+use tor_basic_utils::{time::SaturatingSystemTime, RngExt};
 use tor_dircommon::{
     authority::AuthorityContacts,
     config::{DirTolerance, DownloadScheduleConfig},
@@ -37,156 +30,9 @@ use tor_error::internal;
 use tor_netdoc::doc::netstatus::ConsensusFlavor;
 
 use crate::{
-    database::{self, sql},
+    database::{self, sql, Timestamp},
     err::{DatabaseError, FatalError},
 };
-
-/// A saturating wrapper around [`SystemTime`].
-///
-/// This type implements a wrapper around [`SystemTime`] in order to provide
-/// implementations for [`SaturatingSystemTime::saturating_add()`] as well as
-/// [`SaturatingSystemTime::saturating_sub()`].  Those functions behave similar
-/// to [`Duration::saturating_add()`] and [`Duration::saturating_sub()`]
-/// respectively.
-///
-/// Additionally, this type also implements [`Deref`] into [`SystemTime`]
-/// alongside [`From<SystemTime>`] in order to allow a seamless interaction
-/// between these two types.
-///
-/// Besides this, there is also a [`From`] implementation, that safely calculates
-/// the [`Duration`] since [`SaturatingSystemTime::min()`].
-///
-/// Also, for convience, this type implements [`FromSql`] and [`ToSql`].
-///
-/// TODO: In the medium- and long-term, we should make an upstream merge request
-/// to Rust, adding these methods to [`SystemTime`] natively; it has been
-/// requested by other parties too.
-///
-/// TODO: Maybe this type is better placed in the [`database`] module, but we
-/// can do this in case this needs to be used by other modules in the code.
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-struct SaturatingSystemTime(SystemTime);
-
-impl SaturatingSystemTime {
-    /// Returns the maximum value of a [`SaturatingSystemTime`] and
-    /// hypothetically `SystemTime::MAX`.
-    ///
-    /// In POSIX, the maximum system time is represented by the infamous
-    /// `struct timespec`, which contains a `time_t` for representing the
-    /// seconds since the epoch and another integer for storing the nanons after
-    /// the `time_t`.
-    ///
-    /// This effectively defines the maximum time a system can represent, namely
-    /// the upper limit of `time_t` plus `1s - 1ns`.
-    ///
-    /// In this code, we assume that `time_t` can represent a [`i64::MAX`],
-    /// which is assured in unit tests below.  It is possible for `time_t` to
-    /// be unsigned, which we accept too, but we will still use the [`i64::MAX`]
-    /// limit for all things requiring the above said limit, which is okay,
-    /// given that [`i64::MAX`] as well as [`u64::MAX`] are two million years
-    /// away from now.
-    ///
-    /// # Specifications
-    ///
-    /// * <https://man7.org/linux/man-pages/man3/time_t.3type.html>
-    /// * <https://man7.org/linux/man-pages/man3/timespec.3type.html>
-    fn max() -> Self {
-        Self(
-            Self::min()
-                .checked_add(Duration::new(i64::MAX as u64, 999_999_999))
-                .expect("cannot represent (i64::MAX, 999_999_999 as a SystemTime"),
-        )
-    }
-
-    /// Returns the minimum value of a [`SaturatingSystemTime`].
-    ///
-    /// Unfortunately, POSIX does not specify whether `time_t` is signed or not.
-    /// The overall consensus happens to be that it is implemented as a signed
-    /// 64-but integer, but we have no real gurantee for that.
-    ///
-    /// To mitigate that, we simply use [`SystemTime::UNIX_EPOCH`] as the
-    /// lower-bound, as it is guranteed to be representable with every `time_t`
-    /// implementation (i.e. as `0`).  This obviously comes with the downside
-    /// of not being able to represent timestamps before the Unix epoch, but
-    /// given that this is over 55 years ago at the time of writing, there is
-    /// probably little to not practical need to support this.
-    ///
-    /// # Specifications
-    ///
-    /// * <https://man7.org/linux/man-pages/man3/time_t.3type.html>
-    /// * <https://man7.org/linux/man-pages/man3/timespec.3type.html>
-    fn min() -> Self {
-        Self(SystemTime::UNIX_EPOCH)
-    }
-
-    /// Converts a [`SystemTime`] into a [`SaturatingSystemTime`] saturatingly.
-    ///
-    /// In other words: This method rounds `value` into
-    /// [`SaturatingSystemTime::min()`] and [`SaturatingSystemTime::max()`],
-    /// if it lies outside the interval spanned up by those too.
-    fn saturating_convert(mut value: SystemTime) -> Self {
-        value = std::cmp::max(value, *Self::min());
-        value = std::cmp::min(value, *Self::max());
-        Self(value)
-    }
-
-    /// Securely adds a [`Duration`] to a [`SaturatingSystemTime`].
-    ///
-    /// This method adds a [`Duration`] to a [`SaturatingSystemTime`], returning
-    /// [`SaturatingSystemTime::max()`] in the case of the result being
-    /// unrepresentable by a [`SystemTime`].
-    fn saturating_add(self, duration: Duration) -> Self {
-        // Without the min(), `SystemTime`s second field being `u64` would fail
-        // here.
-        std::cmp::min(
-            Self((*self).checked_add(duration).unwrap_or(*Self::max())),
-            Self::max(),
-        )
-    }
-
-    /// Securely subtracts a [`Duration`] from a [`SaturatingSystemTime`].
-    ///
-    /// This method removes a [`Duration`] from a [`SaturatingSystemTime`],
-    /// returning [`SaturatingSystemTime::min()`] in the case of the result
-    /// being unrepresentable by a [`SystemTime`].
-    fn saturating_sub(self, duration: Duration) -> Self {
-        // Without the max(), `time_t` being `i64` would fail here.
-        std::cmp::max(
-            Self((*self).checked_sub(duration).unwrap_or(*Self::min())),
-            Self::min(),
-        )
-    }
-
-    /// Converts a [`SaturatingSystemTime`] into a [`u64`] representing the
-    /// seconds since the epoch.
-    fn into_unix_time(self) -> u64 {
-        (*self)
-            .duration_since(*Self::min())
-            .expect("invalid unix time representation??")
-            .as_secs()
-    }
-}
-
-impl Deref for SaturatingSystemTime {
-    type Target = SystemTime;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl FromSql for SaturatingSystemTime {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        // The `as u64` conversion is safe due to database constraints.
-        Ok(Self::min().saturating_add(Duration::from_secs(value.as_i64()? as u64)))
-    }
-}
-
-impl ToSql for SaturatingSystemTime {
-    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(self.into_unix_time() as i64))
-    }
-}
 
 /// Obtains the most recent valid consensus from the database.
 ///
@@ -252,15 +98,15 @@ fn get_recent_consensus(
         .query_one(
             params![
                 flavor.name(),
-                now,
+                Timestamp(now),
                 tolerance.pre_valid_tolerance().as_secs(),
                 tolerance.post_valid_tolerance().as_secs()
             ],
             |row| {
                 Ok((
-                    row.get::<_, SaturatingSystemTime>(0)?,
-                    row.get::<_, SaturatingSystemTime>(1)?,
-                    row.get::<_, SaturatingSystemTime>(2)?,
+                    row.get::<_, Timestamp>(0)?.0,
+                    row.get::<_, Timestamp>(1)?.0,
+                    row.get::<_, Timestamp>(2)?.0,
                     row.get::<_, Vec<u8>>(3)?,
                 ))
             },
@@ -302,16 +148,16 @@ fn calculate_sync_timeout<R: Rng>(
 ) -> Duration {
     assert!(fresh_until < valid_until);
 
+    let fresh_until = fresh_until.into_unix_time().try_into().unwrap_or(0_u64);
+    let valid_until = valid_until.into_unix_time().try_into().unwrap_or(0_u64);
+    let now = now.into_unix_time().try_into().unwrap_or(0_u64);
+
     let offset = rng
-        .gen_range_checked(0..=(valid_until.into_unix_time() - fresh_until.into_unix_time()) / 2)
+        .gen_range_checked(0..=(valid_until - fresh_until) / 2)
         .expect("invalid range???");
 
-    Duration::from_secs(
-        fresh_until
-            .saturating_add(Duration::from_secs(offset))
-            .saturating_sub(Duration::from_secs(now.into_unix_time()))
-            .into_unix_time(),
-    )
+    // fresh_until + offset - now
+    Duration::from_secs(fresh_until.saturating_add(offset).saturating_sub(now))
 }
 
 /// Runs forever in the current task, performing the core operation of a directory mirror.
@@ -354,7 +200,7 @@ pub(super) async fn serve<R: Rng, F: Fn() -> SystemTime>(
     now_fn: F,
 ) -> Result<(), FatalError> {
     loop {
-        let now = SaturatingSystemTime::saturating_convert(now_fn());
+        let now = SaturatingSystemTime::from(now_fn());
 
         // (1) Call get_recent_consensus() to obtain the most recent and non-expired
         // consensus from the database.
@@ -441,19 +287,19 @@ mod test {
     lazy_static! {
     /// Wed Jan 01 2020 00:00:00 GMT+0000
     static ref VALID_AFTER: SaturatingSystemTime =
-        SaturatingSystemTime::min().saturating_add(Duration::from_secs(1577836800));
+        SaturatingSystemTime::from(SystemTime::UNIX_EPOCH + Duration::from_secs(1577836800));
 
     /// Wed Jan 01 2020 01:00:00 GMT+0000
     static ref FRESH_UNTIL: SaturatingSystemTime =
-        VALID_AFTER.saturating_add(Duration::from_secs(60 * 60));
+        (**VALID_AFTER + Duration::from_secs(60 * 60)).into();
 
     /// Wed Jan 01 2020 02:00:00 GMT+0000
     static ref FRESH_UNTIL_HALF: SaturatingSystemTime =
-        FRESH_UNTIL.saturating_add(Duration::from_secs(60 * 60));
+        (**FRESH_UNTIL + Duration::from_secs(60 * 60)).into();
 
     /// Wed Jan 01 2020 03:00:00 GMT+0000
     static ref VALID_UNTIL: SaturatingSystemTime =
-        FRESH_UNTIL.saturating_add(Duration::from_secs(60 * 60 * 2));
+        (**FRESH_UNTIL + Duration::from_secs(60 * 60 * 2)).into();
     }
 
     const CONTENT: &str = "Lorem ipsum dolor sit amet.";
@@ -484,9 +330,9 @@ mod test {
                     "DD14CBBF0E74909AAC7F248A85D190AFD8DA98265CEF95FC90DFDDABEA7C2E66",
                     "0000000000000000000000000000000000000000000000000000000000000000", // not the correct hash
                     ConsensusFlavor::Plain.name(),
-                    *VALID_AFTER,
-                    *FRESH_UNTIL,
-                    *VALID_UNTIL,
+                    Timestamp(*VALID_AFTER),
+                    Timestamp(*FRESH_UNTIL),
+                    Timestamp(*VALID_UNTIL),
                 ],
             )
             .unwrap();
@@ -494,37 +340,6 @@ mod test {
         .unwrap();
 
         pool
-    }
-
-    #[test]
-    fn saturating_system_time() {
-        // Assert that the maximum is actually the maximum.
-        assert_eq!(
-            SaturatingSystemTime::max().saturating_add(Duration::new(0, 1)),
-            SaturatingSystemTime::max()
-        );
-
-        // Assert that the minimum is actually the minimum.
-        assert_eq!(
-            SaturatingSystemTime::min().saturating_sub(Duration::new(0, 1)),
-            SaturatingSystemTime::min()
-        );
-
-        // Check the we can always convert everything into an absolute Unix.
-        assert_eq!(
-            SaturatingSystemTime::max()
-                .duration_since(*SaturatingSystemTime::min())
-                .unwrap()
-                .as_nanos(),
-            9223372036854775807999999999
-        );
-
-        // Same as above but with our own function
-        assert_eq!(
-            SaturatingSystemTime::max().into_unix_time(),
-            9223372036854775807
-        );
-        assert_eq!(SaturatingSystemTime::min().into_unix_time(), 0);
     }
 
     #[test]
@@ -547,7 +362,7 @@ mod test {
                 tx,
                 ConsensusFlavor::Plain,
                 &no_tolerance,
-                SaturatingSystemTime::min(),
+                SaturatingSystemTime::from(SystemTime::UNIX_EPOCH),
             )
             .unwrap()
             .is_none());
@@ -646,20 +461,29 @@ mod test {
     fn sync_timeout() {
         // We repeat the tests a few thousand times to go over many random values.
         for _ in 0..10000 {
-            let now = SaturatingSystemTime::min().saturating_add(Duration::from_secs(42));
+            let now = SaturatingSystemTime::from(SystemTime::UNIX_EPOCH)
+                .saturating_add(Duration::from_secs(42));
 
             let dur = calculate_sync_timeout(*FRESH_UNTIL, *VALID_UNTIL, now, &mut testing_rng());
             assert!(
                 dur.as_secs()
                     >= FRESH_UNTIL
-                        .saturating_sub(Duration::from_secs(now.into_unix_time()))
+                        .saturating_sub(Duration::from_secs(
+                            now.into_unix_time().try_into().unwrap()
+                        ))
                         .into_unix_time()
+                        .try_into()
+                        .unwrap()
             );
             assert!(
                 dur.as_secs()
                     <= FRESH_UNTIL_HALF
-                        .saturating_sub(Duration::from_secs(now.into_unix_time()))
+                        .saturating_sub(Duration::from_secs(
+                            now.into_unix_time().try_into().unwrap()
+                        ))
                         .into_unix_time()
+                        .try_into()
+                        .unwrap()
             );
         }
     }
