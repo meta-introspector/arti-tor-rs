@@ -6,14 +6,58 @@ set -euo pipefail
 
 : "${CARGO:=cargo}"
 
+NUM_CHUNKS=1
+CHUNK_N=0
+ 
+mapfile -t CRATES < <( maint/list_crates --all )
+NUM_CRATES=${#CRATES[@]}
+
+OPTS="c:n:"
+
+while getopts ${OPTS} opt; do
+    case ${opt} in
+        c) 
+            if ! [[ "${OPTARG}" =~ ^[0-9]+$ ]]
+                then
+                    echo "Argument of -c must be a non-negative integer."
+                    exit 1
+            else 
+                CHUNK_N=$(( CHUNK_N+OPTARG ))
+            fi
+            ;;
+        n)
+            if ! [[ "${OPTARG}" =~ ^[0-9]+$ ]]
+                then
+                    echo "Argument of -n must be a positive integer."
+                    exit 1
+            else 
+                NUM_CHUNKS=${OPTARG}
+            fi
+            ;;
+        :)
+            echo "Option -${OPTARG} requires an argument."  
+            ;;
+        ?)
+            echo "Invalid option: ${OPTARG}."
+            exit 1
+            ;;
+    esac
+done
+
+if [[ $CHUNK_N -gt $NUM_CHUNKS ]]
+    then
+        echo "The chunk number (-c) must be less than or equal to the number of chunks (-n)."
+        exit 1
+fi  
+
 x () {
     echo ": $*"
     "$@"
 }
 
-for crate in $(maint/list_crates --all); do
-    echo ==================== "$crate" ====================
+for i in $(seq "$CHUNK_N" "$NUM_CHUNKS" "$(( NUM_CRATES-1 ))"); do
+    echo ==================== "${CRATES[i]}" ====================
     # allow $CARGO to contain multiple words
     # shellcheck disable=SC2086
-    x $CARGO test -p "$crate" --all-targets
+    x $CARGO test -p "${CRATES[i]}" --all-targets
 done

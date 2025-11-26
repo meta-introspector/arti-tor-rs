@@ -281,7 +281,7 @@ rust-recent-integration:
   artifacts:
     paths:
       - artifacts
-    expire_in: 1 day
+    expire_in: 1 hours
 
 .rust-recent-arti-extra-features-template:
   script: &rust-recent-arti-extra-features-script
@@ -319,7 +319,7 @@ rust-recent-arti-extra-features:
   artifacts:
     paths:
       - artifacts
-    expire_in: 1 day
+    expire_in: 1 hours
 
 rust-latest-arti-extra-features:
   stage: test
@@ -751,7 +751,15 @@ every-crate:
   needs: []
   script:
     - maint/common/apt-install python3-toml
-    - ./maint/every-crate
+    - ./maint/every-crate -c "$PARALLEL_N" -n 5
+  parallel:
+    matrix:
+      - PARALLEL_N:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
 
 matrix-check:
   stage: test
