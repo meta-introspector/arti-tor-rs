@@ -460,23 +460,7 @@ where
         _ => Rotation::NEVER,
     };
     let path = config.path.path(path_resolver)?;
-
-    let directory = match path.parent() {
-        None => {
-            return Err(anyhow!(
-                "Logfile path \"{}\" did not have a parent directory",
-                path.display_lossy()
-            ));
-        }
-        Some(p) if p == Path::new("") => Path::new("."),
-        Some(d) => d,
-    };
-    mistrust.make_directory(directory).with_context(|| {
-        format!(
-            "Unable to create parent directory for logfile \"{}\"",
-            path.display_lossy()
-        )
-    })?;
+    let directory = ensure_parent_dir(&path, mistrust)?;
     let fname = path
         .file_name()
         .ok_or_else(|| anyhow!("No path for log file"))
