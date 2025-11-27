@@ -78,7 +78,7 @@ impl StreamParameters {
     /// Crate-internal: Get a set of [`BeginFlags`] for this stream.
     pub(crate) fn begin_flags(&self) -> BeginFlags {
         if self.suppress_begin_flags {
-            0.into()
+            BeginFlags::empty()
         } else {
             self.ip_version.into()
         }

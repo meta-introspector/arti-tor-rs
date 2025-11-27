@@ -14,7 +14,7 @@
 
 use crate::ConsensusRelays;
 use crate::params::NetParameters;
-use bitflags::bitflags;
+use enumset::{EnumSet, EnumSetType};
 use tor_netdoc::doc::netstatus::{self, MdConsensus, MdRouterStatus, NetParams};
 
 /// Helper: Calculate the function we should use to find initial relay
@@ -166,40 +166,45 @@ impl RelayWeight {
     }
 }
 
-bitflags! {
-    /// A kind of relay, for the purposes of selecting a relay by weight.
-    ///
-    /// Relays can have or lack the Guard flag, the Exit flag, and the
-    /// V2Dir flag. All together, this makes 8 kinds of relays.
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    struct WeightKind: u8 {
-        /// Flag in weightkind for Guard relays.
-        const GUARD = 1 << 0;
-        /// Flag in weightkind for Exit relays.
-        const EXIT = 1 << 1;
-        /// Flag in weightkind for V2Dir relays.
-        const DIR = 1 << 2;
-    }
+/// Wrapper struct around `EnumSet` of [`WeightKind`].
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct WeightKinds(EnumSet<WeightKind>);
+
+/// A kind of relay, for the purposes of selecting a relay by weight.
+///
+/// Relays can have or lack the Guard flag, the Exit flag, and the
+/// V2Dir flag. All together, this makes 8 kinds of relays.
+#[derive(Debug, EnumSetType)]
+#[enumset(repr = "u8")]
+enum WeightKind {
+    /// Flag in weightkind for Guard relays.
+    Guard,
+    /// Flag in weightkind for Exit relays.
+    Exit,
+    /// Flag in weightkind for V2Dir relays.
+    Dir,
 }
 
-impl WeightKind {
+impl WeightKinds {
+    /// Return the index to use for this kind of a relay within a WeightSet.
+    fn idx(&self) -> usize {
+        self.0.as_u32() as usize
+    }
+
     /// Return the appropriate WeightKind for a relay.
     fn for_rs(rs: &MdRouterStatus) -> Self {
-        let mut r = WeightKind::empty();
+        let mut r = EnumSet::empty();
         if rs.is_flagged_guard() {
-            r |= WeightKind::GUARD;
+            r |= WeightKind::Guard;
         }
         if rs.is_flagged_exit() {
-            r |= WeightKind::EXIT;
+            r |= WeightKind::Exit;
         }
         if rs.is_flagged_v2dir() {
-            r |= WeightKind::DIR;
+            r |= WeightKind::Dir;
         }
-        r
-    }
-    /// Return the index to use for this kind of a relay within a WeightSet.
-    fn idx(self) -> usize {
-        self.bits() as usize
+
+        Self(r)
     }
 }
 
@@ -224,7 +229,7 @@ pub(crate) struct WeightSet {
     // Before making this change, however,
     // we should think a little about performance and precision.
     shift: u8,
-    /// A set of RelayWeight values, indexed by [`WeightKind::idx`], used
+    /// A set of RelayWeight values, indexed by [`WeightKinds::idx`], used
     /// to weight different kinds of relays.
     w: [RelayWeight; 8],
 }
@@ -237,14 +242,14 @@ impl WeightSet {
     /// actually matches the given role.  For example, if `role` is Guard
     /// we don't check whether or not `rs` actually has the Guard flag.
     pub(crate) fn weight_rs_for_role(&self, rs: &MdRouterStatus, role: WeightRole) -> u64 {
-        self.weight_bw_for_role(WeightKind::for_rs(rs), rs.weight(), role)
+        self.weight_bw_for_role(WeightKinds::for_rs(rs), rs.weight(), role)
     }
 
     /// Find the 64-bit weight to report for a relay of `kind` whose weight in
     /// the consensus is `relay_weight` when using it for `role`.
     fn weight_bw_for_role(
         &self,
-        kind: WeightKind,
+        kind: WeightKinds,
         relay_weight: &netstatus::RelayWeight,
         role: WeightRole,
     ) -> u64 {
@@ -313,7 +318,7 @@ impl WeightSet {
         let w_both = single(p, "Wgd", "Wmd", "Wed", "Wbd");
 
         // Note that the positions of the elements in this array need to
-        // match the values returned by WeightKind.as_idx().
+        // match the values returned by WeightKinds.idx().
         let w = [
             w_none,
             w_guard,
@@ -523,24 +528,30 @@ mod test {
         assert_eq!(ws.shift, 0);
 
         assert_eq!(ws.w[0].as_guard, 5904);
-        assert_eq!(ws.w[(WeightKind::GUARD.bits()) as usize].as_guard, 5904);
-        assert_eq!(ws.w[(WeightKind::EXIT.bits()) as usize].as_exit, 10000);
         assert_eq!(
-            ws.w[(WeightKind::EXIT | WeightKind::GUARD).bits() as usize].as_dir,
+            ws.w[(EnumSet::only(WeightKind::Guard).as_u8()) as usize].as_guard,
+            5904
+        );
+        assert_eq!(
+            ws.w[(EnumSet::only(WeightKind::Exit).as_u8()) as usize].as_exit,
+            10000
+        );
+        assert_eq!(
+            ws.w[(WeightKind::Exit | WeightKind::Guard).as_u8() as usize].as_dir,
             0
         );
         assert_eq!(
-            ws.w[(WeightKind::GUARD | WeightKind::DIR).bits() as usize].as_dir,
+            ws.w[(WeightKind::Guard | WeightKind::Dir).as_u8() as usize].as_dir,
             4096
         );
         assert_eq!(
-            ws.w[(WeightKind::GUARD | WeightKind::DIR).bits() as usize].as_dir,
+            ws.w[(WeightKind::Guard | WeightKind::Dir).as_u8() as usize].as_dir,
             4096
         );
 
         assert_eq!(
             ws.weight_bw_for_role(
-                WeightKind::GUARD | WeightKind::DIR,
+                WeightKinds(WeightKind::Guard | WeightKind::Dir),
                 &RW::Unmeasured(7777),
                 WeightRole::Guard
             ),
@@ -549,7 +560,7 @@ mod test {
 
         assert_eq!(
             ws.weight_bw_for_role(
-                WeightKind::GUARD | WeightKind::DIR,
+                WeightKinds(WeightKind::Guard | WeightKind::Dir),
                 &RW::Measured(7777),
                 WeightRole::Guard
             ),
@@ -558,7 +569,7 @@ mod test {
 
         assert_eq!(
             ws.weight_bw_for_role(
-                WeightKind::GUARD | WeightKind::DIR,
+                WeightKinds(WeightKind::Guard | WeightKind::Dir),
                 &RW::Measured(7777),
                 WeightRole::Middle
             ),
@@ -567,7 +578,7 @@ mod test {
 
         assert_eq!(
             ws.weight_bw_for_role(
-                WeightKind::GUARD | WeightKind::DIR,
+                WeightKinds(WeightKind::Guard | WeightKind::Dir),
                 &RW::Measured(7777),
                 WeightRole::Exit
             ),
@@ -576,7 +587,7 @@ mod test {
 
         assert_eq!(
             ws.weight_bw_for_role(
-                WeightKind::GUARD | WeightKind::DIR,
+                WeightKinds(WeightKind::Guard | WeightKind::Dir),
                 &RW::Measured(7777),
                 WeightRole::BeginDir
             ),
@@ -585,7 +596,7 @@ mod test {
 
         assert_eq!(
             ws.weight_bw_for_role(
-                WeightKind::GUARD | WeightKind::DIR,
+                WeightKinds(WeightKind::Guard | WeightKind::Dir),
                 &RW::Measured(7777),
                 WeightRole::Unweighted
             ),
@@ -621,21 +632,30 @@ mod test {
     #[test]
     fn weight_flags() {
         let rs1 = rs_builder().set_flags(RelayFlag::Exit).build().unwrap();
-        assert_eq!(WeightKind::for_rs(&rs1), WeightKind::EXIT);
+        assert_eq!(
+            WeightKinds::for_rs(&rs1),
+            WeightKinds(WeightKind::Exit.into())
+        );
 
         let rs1 = rs_builder().set_flags(RelayFlag::Guard).build().unwrap();
-        assert_eq!(WeightKind::for_rs(&rs1), WeightKind::GUARD);
+        assert_eq!(
+            WeightKinds::for_rs(&rs1),
+            WeightKinds(WeightKind::Guard.into())
+        );
 
         let rs1 = rs_builder().set_flags(RelayFlag::V2Dir).build().unwrap();
-        assert_eq!(WeightKind::for_rs(&rs1), WeightKind::DIR);
+        assert_eq!(
+            WeightKinds::for_rs(&rs1),
+            WeightKinds(WeightKind::Dir.into())
+        );
 
         let rs1 = rs_builder().build().unwrap();
-        assert_eq!(WeightKind::for_rs(&rs1), WeightKind::empty());
+        assert_eq!(WeightKinds::for_rs(&rs1), WeightKinds(EnumSet::empty()));
 
         let rs1 = rs_builder().set_flags(RelayFlags::all()).build().unwrap();
         assert_eq!(
-            WeightKind::for_rs(&rs1),
-            WeightKind::EXIT | WeightKind::GUARD | WeightKind::DIR
+            WeightKinds::for_rs(&rs1),
+            WeightKinds(WeightKind::Exit | WeightKind::Guard | WeightKind::Dir)
         );
     }
 

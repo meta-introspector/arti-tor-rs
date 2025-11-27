@@ -204,7 +204,7 @@ impl msg::Body for ConnectUdp {
     }
 
     fn encode_onto<W: Writer + ?Sized>(self, w: &mut W) -> EncodeResult<()> {
-        w.write_u32(self.flags.bits());
+        w.write_u32(self.flags.0.as_u32());
         w.write(&self.addr)?;
         Ok(())
     }

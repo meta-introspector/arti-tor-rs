@@ -6404,12 +6404,12 @@ name = "tor-cell"
 version = "0.36.0"
 dependencies = [
  "amplify",
- "bitflags 2.10.0",
  "bytes",
  "caret",
  "derive-deftly",
  "derive_more",
  "educe",
+ "enumset",
  "hex",
  "hex-literal",
  "itertools 0.14.0",
@@ -7236,9 +7236,9 @@ name = "tor-netdir"
 version = "0.36.0"
 dependencies = [
  "async-trait",
- "bitflags 2.10.0",
  "derive_more",
  "digest",
+ "enumset",
  "float_eq",
  "futures",
  "hex",
