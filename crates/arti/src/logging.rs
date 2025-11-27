@@ -363,7 +363,11 @@ where
 /// This doesn't allow for filtering, since most of our spans are exported at the trace level
 /// anyways, and filtering can easily be done when viewing the data.
 #[cfg(feature = "opentelemetry")]
-fn otel_layer<S>(config: &LoggingConfig, path_resolver: &CfgPathResolver) -> Result<impl Layer<S>>
+fn otel_layer<S>(
+    config: &LoggingConfig,
+    mistrust: &Mistrust,
+    path_resolver: &CfgPathResolver,
+) -> Result<impl Layer<S>>
 where
     S: Subscriber + for<'span> tracing_subscriber::registry::LookupSpan<'span>,
 {
@@ -383,10 +387,12 @@ where
         .build();
 
     let span_processor = if let Some(otel_file_config) = &config.opentelemetry.file {
+        let path = otel_file_config.path.path(path_resolver)?;
+        let _ = ensure_parent_dir(&path, mistrust)?;
         let file = std::fs::File::options()
             .create(true)
             .append(true)
-            .open(otel_file_config.path.path(path_resolver)?)?;
+            .open(path)?;
 
         let exporter = otlp_file_exporter::FileExporter::new(file, resource.clone());
 
@@ -460,7 +466,27 @@ where
         _ => Rotation::NEVER,
     };
     let path = config.path.path(path_resolver)?;
+    let directory = ensure_parent_dir(&path, mistrust)?;
+    let fname = path
+        .file_name()
+        .ok_or_else(|| anyhow!("No path for log file"))
+        .map(Path::new)?;
 
+    let appender = RollingFileAppender::new(rotation, directory, fname);
+    let (nonblocking, guard) = non_blocking(appender);
+    let layer = fmt::layer()
+        // we apply custom field formatting so that error fields are listed last
+        .fmt_fields(fields::ErrorsLastFieldFormatter)
+        .with_ansi(false)
+        .with_writer(nonblocking)
+        .with_timer(timer)
+        .with_filter(filter);
+    Ok((layer, guard))
+}
+
+/// Check if the given path has a valid parent directory and create if it does not.
+/// Returns the parent directory on success.
+fn ensure_parent_dir(path: &Path, mistrust: &Mistrust) -> Result<std::path::PathBuf> {
     let directory = match path.parent() {
         None => {
             return Err(anyhow!(
@@ -477,21 +503,8 @@ where
             path.display_lossy()
         )
     })?;
-    let fname = path
-        .file_name()
-        .ok_or_else(|| anyhow!("No path for log file"))
-        .map(Path::new)?;
 
-    let appender = RollingFileAppender::new(rotation, directory, fname);
-    let (nonblocking, guard) = non_blocking(appender);
-    let layer = fmt::layer()
-        // we apply custom field formatting so that error fields are listed last
-        .fmt_fields(fields::ErrorsLastFieldFormatter)
-        .with_ansi(false)
-        .with_writer(nonblocking)
-        .with_timer(timer)
-        .with_filter(filter);
-    Ok((layer, guard))
+    Ok(directory.to_path_buf())
 }
 
 /// Try to construct a tracing [`Layer`] for all of the configured logfiles.
@@ -605,7 +618,7 @@ pub(crate) fn setup_logging(
     let registry = registry.with(journald_layer(config)?);
 
     #[cfg(feature = "opentelemetry")]
-    let registry = registry.with(otel_layer(config, path_resolver)?);
+    let registry = registry.with(otel_layer(config, mistrust, path_resolver)?);
 
     #[cfg(feature = "tokio-console")]
     let registry = {
