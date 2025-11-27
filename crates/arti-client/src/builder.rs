@@ -87,6 +87,8 @@ pub struct TorClientBuilder<R: Runtime> {
 ///
 /// (Reducing this value would count as a breaking change.)
 pub const MAX_LOCAL_RESOURCE_TIMEOUT: Duration = Duration::new(5, 0);
+const RETRY_INITIAL_DELAY: Duration = Duration::from_millis(50);
+const RETRY_MAX_DELAY: Duration = Duration::from_secs(1);
 
 impl<R: Runtime> TorClientBuilder<R> {
     /// Construct a new TorClientBuilder with the given runtime.
@@ -188,12 +190,19 @@ impl<R: Runtime> TorClientBuilder<R> {
     pub fn create_unbootstrapped(&self) -> Result<TorClient<R>> {
         let timeout = self.local_resource_timeout_or(Duration::from_millis(0))?;
         let give_up_at = Instant::now() + timeout;
+        let mut previous_delay = None;
         let mut first_attempt = true;
 
         loop {
-            match self.create_unbootstrapped_inner(Instant::now, give_up_at, first_attempt) {
+            match self.create_unbootstrapped_inner(
+                Instant::now,
+                give_up_at,
+                first_attempt,
+                previous_delay,
+            ) {
                 Err(delay) => {
                     first_attempt = false;
+                    previous_delay = Some(delay);
                     std::thread::sleep(delay);
                 }
                 Ok(other) => return other,
@@ -213,13 +222,19 @@ impl<R: Runtime> TorClientBuilder<R> {
         // concerned that doing so would just add a lot of complexity.
         let timeout = self.local_resource_timeout_or(Duration::from_millis(500))?;
         let give_up_at = self.runtime.now() + timeout;
+        let mut previous_delay = None;
         let mut first_attempt = true;
 
         loop {
-            match self.create_unbootstrapped_inner(|| self.runtime.now(), give_up_at, first_attempt)
-            {
+            match self.create_unbootstrapped_inner(
+                || self.runtime.now(),
+                give_up_at,
+                first_attempt,
+                previous_delay,
+            ) {
                 Err(delay) => {
                     first_attempt = false;
+                    previous_delay = Some(delay);
                     self.runtime.sleep(delay).await;
                 }
                 Ok(other) => return other,
@@ -237,6 +252,7 @@ impl<R: Runtime> TorClientBuilder<R> {
         now: F,
         give_up_at: Instant,
         first_attempt: bool,
+        previous_delay: Option<Duration>,
     ) -> StdResult<Result<TorClient<R>>, Duration>
     where
         F: FnOnce() -> Instant,
@@ -271,9 +287,13 @@ impl<R: Runtime> TorClientBuilder<R> {
                             humantime::Duration::from(remaining),
                         );
                     }
+                    // Double the previous delay, but cap it at MAX_DELAY.
+                    let next_delay = previous_delay.map_or(RETRY_INITIAL_DELAY, |prev| {
+                        prev.saturating_mul(2).min(RETRY_MAX_DELAY)
+                    });
+
                     // We'll retry at least once.
-                    // TODO: Maybe use a smarter backoff strategy here?
-                    Err(Duration::from_millis(50).min(remaining))
+                    Err(next_delay.min(remaining))
                 }
             }
             // We either succeeded, or failed for a reason other than LocalResourceAlreadyInUse
