@@ -117,6 +117,7 @@ impl<'a, 'b> DownloadManager<'a, 'b> {
     /// The relevant algorithm is non-trivial, but well-documented in the
     /// [`DownloadManager`], which is why we will leave it out here by just
     /// referencing to it.
+    #[allow(clippy::cognitive_complexity)]
     pub(super) async fn download<Req: Downloadable + Debug, R: Rng>(
         &mut self,
         req: &Req,
