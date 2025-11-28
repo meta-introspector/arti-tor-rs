@@ -216,4 +216,75 @@ where
     unreachable!("timeout_sequence returned a finite sequence");
 }
 
-// TODO : Write some tests.
+#[cfg(test)]
+mod tests {
+
+    #![allow(clippy::let_underscore_future)]
+    use super::*;
+    use crate::logstate as ls;
+    use crate::ratelim as rl;
+    use tor_rtcompat::BlockOn;
+    use tor_rtmock::MockRuntime;
+
+    struct Ls(ls::LogState);
+
+    unsafe impl Send for Ls {}
+    unsafe impl Sync for Ls {}
+
+    impl Loggable for Ls {
+        fn flush(&mut self, summarizing: std::time::Duration) -> Activity {
+            let activity = self.0.activity();
+            match activity {
+                Activity::Active => {
+                    tracing::event!(
+                        tracing::Level::DEBUG,
+                        "{}",
+                        self.0.display_problem(summarizing)
+                    );
+                }
+                Activity::Dormant => {
+                    tracing::event!(
+                        tracing::Level::DEBUG,
+                        "{}",
+                        self.0.display_recovery(summarizing)
+                    );
+                }
+            }
+            self.0.reset();
+            activity
+        }
+    }
+
+    fn test_runtime<WF>(_wait: impl FnOnce(MockRuntime) -> WF + Send + 'static)
+    where
+        WF: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let runtime = MockRuntime::new();
+        runtime.clone().block_on(async move {
+            let r = rt::install_runtime(runtime);
+            assert!(r.is_ok());
+            let support = rt::rt_support();
+            assert!(support.is_some());
+            let mut ts = rl::timeout_sequence();
+            assert_eq!(std::time::Duration::from_secs(5), ts.next().expect("5s"));
+            let logstate: ls::LogState = ls::LogState::new("test".to_string());
+            let ratelim = rl::RateLim::new(Ls(logstate));
+            ratelim.event(support.expect("support"), |_| {});
+            assert!(ratelim.inner.lock().expect("task").task_running);
+            let _ = rl::run(support.expect("support"), ratelim);
+        });
+    }
+
+    fn test_runtime_combined(_update: impl FnOnce(&MockRuntime) + Send + 'static) {
+        test_runtime(|_| async move {});
+    }
+
+    #[test]
+    fn new_ratelim() {
+        let logstate: ls::LogState = ls::LogState::new("test".to_string());
+        let ratelim = rl::RateLim::new(Ls(logstate));
+        let mut logstate2: ls::LogState = ls::LogState::new("test".to_string());
+        ratelim.nonevent(|_| logstate2.note_ok());
+        test_runtime_combined(|_| {});
+    }
+}
