@@ -1006,7 +1006,7 @@ impl<B: AbstractTunnelBuilder<R> + 'static, R: Runtime> AbstractTunnelMgr<B, R> 
             // How much time is remaining?
             let remaining = match timeout_at.checked_duration_since(self.runtime.now()) {
                 None => {
-                    retry_err.push(Error::RequestTimeout);
+                    retry_err.push_timed(Error::RequestTimeout, self.runtime.now());
                     break;
                 }
                 Some(t) => t,
@@ -1030,7 +1030,7 @@ impl<B: AbstractTunnelBuilder<R> + 'static, R: Runtime> AbstractTunnelMgr<B, R> 
                             // We ran out of "remaining" time; there is nothing
                             // more to be done.
                             warn!("All tunnel attempts failed due to timeout");
-                            retry_err.push(Error::RequestTimeout);
+                            retry_err.push_timed(Error::RequestTimeout, self.runtime.now());
                             break;
                         }
                     }
@@ -1059,7 +1059,7 @@ impl<B: AbstractTunnelBuilder<R> + 'static, R: Runtime> AbstractTunnelMgr<B, R> 
             // Record the error, flattening it if needed.
             match error {
                 Error::RequestFailed(e) => retry_err.extend(e),
-                e => retry_err.push(e),
+                e => retry_err.push_timed(e, now),
             }
 
             *count += 1;
@@ -1199,6 +1199,7 @@ impl<B: AbstractTunnelBuilder<R> + 'static, R: Runtime> AbstractTunnelMgr<B, R> 
             source: streams::Source,
             building: bool,
             mut err: Error,
+            timestamp: std::time::Instant,
         ) {
             if source == streams::Source::Right {
                 // We don't care about this error, since it is from neither a tunnel we launched
@@ -1210,7 +1211,7 @@ impl<B: AbstractTunnelBuilder<R> + 'static, R: Runtime> AbstractTunnelMgr<B, R> 
                 // secondary reports of other tunnels' failures.
                 err = Error::PendingFailed(Box::new(err));
             }
-            retry_err.push(err);
+            retry_err.push_timed(err, timestamp);
         }
         /// Return a string describing what it means, within the context of this
         /// function, to have gotten an answer from `source`.
@@ -1338,7 +1339,13 @@ impl<B: AbstractTunnelBuilder<R> + 'static, R: Runtime> AbstractTunnelMgr<B, R> 
                                         id,
                                     );
                                 }
-                                record_error(&mut retry_error, src, building, e);
+                                record_error(
+                                    &mut retry_error,
+                                    src,
+                                    building,
+                                    e,
+                                    self.runtime.now(),
+                                );
                                 continue;
                             }
                         }
@@ -1346,14 +1353,26 @@ impl<B: AbstractTunnelBuilder<R> + 'static, R: Runtime> AbstractTunnelMgr<B, R> 
                 }
                 Ok(Err(ref e)) => {
                     debug!("{} sent error {:?}", describe_source(building, src), e);
-                    record_error(&mut retry_error, src, building, e.clone());
+                    record_error(
+                        &mut retry_error,
+                        src,
+                        building,
+                        e.clone(),
+                        self.runtime.now(),
+                    );
                 }
                 Err(oneshot::Canceled) => {
                     debug!(
                         "{} went away (Canceled), quitting take_action right away",
                         describe_source(building, src)
                     );
-                    record_error(&mut retry_error, src, building, Error::PendingCanceled);
+                    record_error(
+                        &mut retry_error,
+                        src,
+                        building,
+                        Error::PendingCanceled,
+                        self.runtime.now(),
+                    );
                     return Err(retry_error);
                 }
             }
