@@ -6383,6 +6383,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tor-bw-ratelim"
+version = "0.0.1"
+dependencies = [
+ "coarsetime",
+ "event-listener 5.2.0",
+ "futures",
+ "pin-project",
+ "tor-rtcompat",
+]
+
+[[package]]
 name = "tor-bytes"
 version = "0.36.0"
 dependencies = [

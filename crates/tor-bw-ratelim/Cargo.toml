@@ -1,0 +1,29 @@
+[package]
+name = "tor-bw-ratelim"
+version = "0.0.1"
+authors = ["The Tor Project, Inc.", "Nick Mathewson <nickm@torproject.org>"]
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+homepage = "https://gitlab.torproject.org/tpo/core/arti/-/wikis/home"
+description = "Abstractions for bandwidth rate limiting in Tor"
+keywords = ["tor", "arti", "async"]
+categories = ["asynchronous"]
+repository = "https://gitlab.torproject.org/tpo/core/arti.git/"
+
+[features]
+default = []
+full = []
+
+[dependencies]
+coarsetime = "0.1.20"
+event-listener = "5"
+futures = "0.3.14"
+pin-project = "1"
+tor-rtcompat = { path = "../tor-rtcompat", version = "0.10.0" }
+
+[dev-dependencies]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

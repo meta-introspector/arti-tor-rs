@@ -33,6 +33,7 @@ members = [
     "crates/tor-config-path",
     "crates/tor-rpc-connect",
     "crates/tor-log-ratelim",
+    "crates/tor-bw-ratelim",
     "crates/tor-rpcbase",
     "crates/tor-memquota",
     "crates/tor-units",
