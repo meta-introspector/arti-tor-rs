@@ -152,13 +152,14 @@ impl<'a, K: Keyword> NetDocReaderBase<'a, K> {
     /// remove data if the reader is nonempty.
     fn line(&mut self) -> Result<&'a str> {
         let remainder = &self.s[self.off..];
-        if let Some(nl_pos) = remainder.find('\n') {
-            self.advance(nl_pos + 1)?;
-            let line = &remainder[..nl_pos];
-
-            // TODO: we should probably detect \r and do something about it.
-            // Just ignoring it isn't the right answer, though.
+        if let Some(cr_pos) = remainder.find("\r\n") {
+            self.advance(cr_pos + 1)?;
+            let line = &remainder[..cr_pos];
             Ok(line)
+        } else if let Some(nl_pos) = remainder.find('\n') {
+            self.advance(nl_pos + 1)?;
+            let parsedline = &remainder[..nl_pos];
+            Ok(parsedline)
         } else {
             self.advance(remainder.len())?; // drain everything.
             Err(EK::TruncatedLine.at_pos(self.pos(self.s.len())))
