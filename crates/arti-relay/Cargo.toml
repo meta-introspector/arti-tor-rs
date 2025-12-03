@@ -44,7 +44,8 @@ safelog = { path = "../safelog", version = "0.7.0" }
 serde = { version = "1.0.103", features = ["derive"] }
 strum = { version = "0.27.1", features = ["derive"] }
 thiserror = "2"
-tokio = { version = "1.7", features = ["signal"] }
+#tokio = { version = "1.7", features = ["signal"] }
+tokio.workspace = true
 tor-chanmgr = { path = "../tor-chanmgr", version = "0.36.0", features = ["relay"] }
 tor-config = { path = "../tor-config", version = "0.36.0" }
 tor-config-path = { path = "../tor-config-path", version = "0.36.0" }

@@ -81,7 +81,7 @@ __is_experimental = []
 
 [dependencies]
 aes = { version = "0.8", optional = true }
-amplify = { version = "4", default-features = false, features = ["derive"] }
+amplify = { version = "4", features = ["derive"] }
 asynchronous-codec = "0.7.0"
 bitvec = "1.0.1"
 bytes = "1"
@@ -106,12 +106,13 @@ nonany = "0.3"
 oneshot-fused-workaround = { path = "../oneshot-fused-workaround", version = "0.5.0" }
 pin-project = "1"
 polyval = { version = "0.6", optional = true }
-postage = { version = "0.5.0", default-features = false, features = ["futures-traits"] }
+postage = { version = "0.5.0", features = ["futures-traits"] }
 rand = "0.9.1"
 rand_core = "0.9.3"
 safelog = { path = "../safelog", version = "0.7.0" }
 slotmap-careful = { path = "../slotmap-careful", version = "0.5.0" }
-smallvec = { version = "1.10", features = ["const_generics"] }
+#smallvec = { version = "1.10", features = ["const_generics"] }
+smallvec = { workspace=true } 
 static_assertions = "1"
 subtle = "2"
 sync_wrapper = "1.0.2"
@@ -130,7 +131,7 @@ tor-hscrypto = { path = "../tor-hscrypto", version = "0.36.0", features = ["memq
 tor-linkspec = { path = "../tor-linkspec", version = "0.36.0" }
 tor-llcrypto = { path = "../tor-llcrypto", version = "0.36.0", features = ["memquota-memcost"] }
 tor-log-ratelim = { path = "../tor-log-ratelim", version = "0.36.0" }
-tor-memquota = { version = "0.36.0", path = "../tor-memquota", default-features = false }
+tor-memquota = { version = "0.36.0", path = "../tor-memquota" }
 tor-protover = { version = "0.36.0", path = "../tor-protover" }
 tor-relay-crypto = { version = "0.36.0", path = "../tor-relay-crypto" }
 tor-rtcompat = { path = "../tor-rtcompat", version = "0.36.0" }
@@ -152,7 +153,7 @@ hex = "0.4"
 hex-literal = "1.0"
 humantime = "2"
 itertools = "0.14.0"
-regex = { version = "1", default-features = false, features = ["std"] }
+regex = { version = "1", features = ["std"] }
 statrs = "0.18.0"
 tokio-crate = { package = "tokio", version = "1.7", features = ["full"] }
 tor-rtcompat = { path = "../tor-rtcompat", version = "0.36.0", features = ["tokio", "native-tls"] }
